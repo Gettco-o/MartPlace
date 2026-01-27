@@ -1,0 +1,3 @@
+from app.interfaces.repositories.product_repository import ProductRepository
+from app.interfaces.repositories.wallet_repository import WalletRepository
+from app.interfaces.repositories.order_repository import OrderRepository
