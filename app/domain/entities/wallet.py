@@ -8,9 +8,15 @@ class Wallet:
       balance: Money
 
       def debit(self, amount: Money) -> None:
+            if amount <= Money(0):
+                  raise ValueError("Debit amount must be positive")
+            if self.balance < amount:
+                  raise ValueError("Insufficient funds")
             self.balance = self.balance.subtract(amount)
 
       def credit(self, amount: Money) -> None:
+            if amount <= Money(0):
+                  raise ValueError("Credit amount must be positive")
             self.balance = self.balance.add(amount)
 
 """ 

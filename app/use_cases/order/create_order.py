@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 from app.domain.entities.order import Order
 from app.domain.value_objects.money import Money
 from app.domain.value_objects.order_status import OrderStatus
@@ -6,16 +7,11 @@ from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
 import uuid
 
+@dataclass
 class CreateOrder:
-      def __init__(
-            self,
-            order_repo: OrderRepository,
-            product_repo: ProductRepository,
-            wallet_repo: WalletRepository,
-      ):
-            self.order_repo = order_repo
-            self.product_repo = product_repo
-            self.wallet_repo = wallet_repo
+      order_repo: OrderRepository
+      product_repo: ProductRepository
+      wallet_repo: WalletRepository
 
       def execute(self, tenant_id: str, user_id: str, products: dict[str, int]) -> Order:
             total_amount = Money(0)

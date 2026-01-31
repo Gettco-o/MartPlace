@@ -1,4 +1,4 @@
-# app/main.py
+"""# app/main.py
 from flask import Flask, request, jsonify
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
@@ -65,3 +65,4 @@ def create_order():
 
 if __name__ == "__main__":
     app.run(debug=True)
+"""
