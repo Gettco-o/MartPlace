@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from app.domain.value_objects.money import Money
 from app.domain.value_objects.order_status import OrderStatus
 
@@ -10,6 +11,7 @@ class Order:
       products: dict[str, int]  # product_id to quantity
       amount: Money
       status: OrderStatus
+      created_at: datetime = datetime.now()
 
 
       def __repr__(self) -> str:

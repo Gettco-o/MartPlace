@@ -1,12 +1,12 @@
-# tests/fakes/fake_wallet_repository.py
 from app.interfaces.repositories.wallet_repository import WalletRepository
+from app.domain.entities.wallet import Wallet
 
 class FakeWalletRepository(WalletRepository):
 
     def __init__(self):
-        self.wallets = {}  # key: (tenant_id, user_id), value: wallet
+        self.wallets: dict[tuple[str,str], Wallet] = {}
 
-    def get_wallet(self, tenant_id: str, user_id: str):
+    def get_wallet(self, tenant_id: str, user_id: str)-> Wallet:
         return self.wallets.get((tenant_id, user_id))
 
     def save(self, wallet):

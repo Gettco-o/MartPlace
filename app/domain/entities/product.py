@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from app.domain.value_objects.money import Money
+from app.domain.exceptions import DomainError
 
 @dataclass
 class Product:
@@ -8,3 +9,11 @@ class Product:
       name: str
       price: Money
       stock: int
+
+      def reduce_stock(self, quantity: int):
+            if quantity < 0:
+                  raise DomainError("Quantity must be positive")
+            if self.stock < quantity:
+                  raise DomainError("Insufficent stock")
+            
+            self.stock -= quantity

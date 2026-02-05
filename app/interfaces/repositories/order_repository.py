@@ -7,5 +7,5 @@ class OrderRepository(ABC):
             pass
 
       @abstractmethod
-      def get_order_by_id(self, tenant_id: str, order_id: str) -> Order | None:
+      def get_by_id(self, tenant_id: str, order_id: str) -> Order | None:
             pass

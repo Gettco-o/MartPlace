@@ -1,16 +1,14 @@
-# tests/fakes/fake_product_repository.py
 from app.interfaces.repositories.product_repository import ProductRepository
+from app.domain.entities.product import Product
 
 class FakeProductRepository(ProductRepository):
 
     def __init__(self):
-        self.products = []
+        self.products: dict[tuple[str,str], Product] = {}
 
-    def get_product_by_id(self, tenant__id, product_id: str):
-        for product in self.products:
-            if product.tenant_id==tenant__id and product.id==product_id:
-                return product
-        return None
+    def get_by_id(self, tenant_id: str, product_id: str) -> Product:
+        return self.products.get((tenant_id, product_id))
 
-    def add(self, product):
-        self.products.append(product)
+    def save(self, product):
+        key = (product.tenant_id, product.id)
+        self.products[key] = product

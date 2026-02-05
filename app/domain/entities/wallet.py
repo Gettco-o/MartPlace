@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from app.domain.value_objects.money import Money
+from app.domain.exceptions import InsufficientFundsError, InvalidAmountError
 
 @dataclass
 class Wallet:
@@ -9,14 +10,14 @@ class Wallet:
 
       def debit(self, amount: Money) -> None:
             if amount <= Money(0):
-                  raise ValueError("Debit amount must be positive")
+                  raise InvalidAmountError("Amount must be positive")
             if self.balance < amount:
-                  raise ValueError("Insufficient funds")
+                  raise InsufficientFundsError("Insufficient funds")
             self.balance = self.balance.subtract(amount)
 
       def credit(self, amount: Money) -> None:
             if amount <= Money(0):
-                  raise ValueError("Credit amount must be positive")
+                  raise InvalidAmountError("Amount must be positive")
             self.balance = self.balance.add(amount)
 
 """ 
