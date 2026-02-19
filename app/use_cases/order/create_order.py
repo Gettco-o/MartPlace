@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from app.domain.entities.order import Order
 from app.domain.value_objects.money import Money
 from app.domain.value_objects.order_status import OrderStatus
+from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
@@ -17,6 +18,7 @@ class CreateOrder:
       product_repo: ProductRepository
       wallet_repo: WalletRepository
       idempotency_repo: IdempotencyRepository
+      event_bus: EventBus
 
       def execute(self, tenant_id: str, user_id: str, products: dict[str, int], idempotency_key: str) -> Order:
 
@@ -51,8 +53,8 @@ class CreateOrder:
                   user_id = user_id,
                   products = products,
                   amount = total_amount,
-                  status = OrderStatus.PAID,
             )
+            order.mark_paid()
 
             for product in product_entities:
                   self.product_repo.save(product)
@@ -67,5 +69,8 @@ class CreateOrder:
                         result_id=order.id
                   )
             )
+
+            self.event_bus.publish(order.events)
+            order.clear_events()
 
             return order

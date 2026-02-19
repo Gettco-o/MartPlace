@@ -3,6 +3,7 @@ from app.domain.entities.idempotency import IdempotencyRecord
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.idempotent_operation import IdempotentOperation
 from app.domain.value_objects.order_status import OrderStatus
+from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.idempotency_repository import IdempotencyRepository
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
@@ -15,6 +16,7 @@ class RefundOrder:
       product_repo: ProductRepository
       wallet_repo: WalletRepository
       idempotency_repo: IdempotencyRepository
+      event_bus: EventBus
 
       def execute(self, tenant_id: str, order_id: str, idempotency_key: str):
             operation = IdempotentOperation.REFUND_ORDER
@@ -42,7 +44,7 @@ class RefundOrder:
             self.wallet_repo.save(wallet)
 
             # Update order
-            order.status = OrderStatus.REFUNDED
+            order.mark_refunded()
             self.order_repo.save(order)
 
             # Save idempotency record LAST
@@ -53,5 +55,8 @@ class RefundOrder:
                   result_id=order.id,
                   )
             )
+
+            self.event_bus.publish(order.events)
+            order.clear_events()
 
             return order
