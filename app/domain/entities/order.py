@@ -16,3 +16,6 @@ class Order:
 
       def __repr__(self) -> str:
             return f"Order(id={self.id}, tenant_id={self.tenant_id}, user_id={self.user_id}, products={self.products}, amount={self.amount}, status={self.status})"
+      
+      def can_refund(self) -> bool:
+            return self.status == OrderStatus.PAID

@@ -4,3 +4,4 @@ class OrderStatus(str, Enum):
       CREATED = "created"
       PAID = "paid"
       FAILED = "failed"
+      REFUNDED = "refunded"

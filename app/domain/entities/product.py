@@ -17,3 +17,9 @@ class Product:
                   raise DomainError("Insufficent stock")
             
             self.stock -= quantity
+
+      def increase_stock(self, quantity: int):
+            if quantity <= 0:
+                  raise DomainError("Quantity must be greater than zero")
+
+            self.stock += quantity
