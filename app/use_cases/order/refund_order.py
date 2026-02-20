@@ -2,11 +2,11 @@ from dataclasses import dataclass
 from app.domain.entities.idempotency import IdempotencyRecord
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.idempotent_operation import IdempotentOperation
-from app.domain.value_objects.order_status import OrderStatus
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.idempotency_repository import IdempotencyRepository
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
+from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
 
 
@@ -16,9 +16,17 @@ class RefundOrder:
       product_repo: ProductRepository
       wallet_repo: WalletRepository
       idempotency_repo: IdempotencyRepository
+      tenant_repo: TenantRepository
       event_bus: EventBus
 
       def execute(self, tenant_id: str, order_id: str, idempotency_key: str):
+
+            tenant = self.tenant_repo.get_by_id(tenant_id)
+            if not tenant:
+                  raise DomainError("Tenant not found")
+            
+            tenant.ensure_active()
+
             operation = IdempotentOperation.REFUND_ORDER
 
             existing = self.idempotency_repo.get(idempotency_key, operation)

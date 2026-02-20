@@ -1,4 +1,5 @@
 from app.use_cases.order.create_order import CreateOrder
+from tests.fakes.fake_event_bus import FakeEventBus
 from app.use_cases.wallet.credit_wallet import CreditWallet
 from tests.fakes.fake_order_repository import FakeOrderRepository
 from tests.fakes.fake_product_repository import FakeProductRepository
@@ -6,6 +7,7 @@ from tests.fakes.fake_wallet_repository import FakeWalletRepository
 from tests.fakes.fake_idempotency_repository import FakeIdempotencyRepository
 from app.domain.entities.product import Product
 from app.domain.value_objects.money import Money
+from app.domain.events.order_created import OrderCreated
 
 """
 def test_create_order():
@@ -66,11 +68,13 @@ def test_create_order_idempotent():
       idem_repo = FakeIdempotencyRepository()
 
       credit_uc = CreditWallet(wallet_repo)
+      fake_bus = FakeEventBus()
       create_order_uc = CreateOrder(
             order_repo,
             product_repo,
             wallet_repo,
             idem_repo,
+            fake_bus,
       )
 
       product = Product(
@@ -99,4 +103,6 @@ def test_create_order_idempotent():
       )
 
       assert order1.id == order2.id
+      # ensure the OrderCreated event was published
+      assert any(isinstance(e, OrderCreated) for e in fake_bus.published_events)
       assert wallet_repo.get_wallet("tenant_1", "user_1").balance.amount == 50

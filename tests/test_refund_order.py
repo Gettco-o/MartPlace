@@ -4,6 +4,8 @@ from app.domain.value_objects.order_status import OrderStatus
 from app.use_cases.order.create_order import CreateOrder
 from app.use_cases.order.refund_order import RefundOrder
 from app.use_cases.wallet.credit_wallet import CreditWallet
+from tests.fakes.fake_event_bus import FakeEventBus
+from app.domain.events.order_refunded import OrderRefunded
 from tests.fakes.fake_idempotency_repository import FakeIdempotencyRepository
 from tests.fakes.fake_order_repository import FakeOrderRepository
 from tests.fakes.fake_product_repository import FakeProductRepository
@@ -19,17 +21,20 @@ def test_refund_order_idempotent():
 
     # use cases
     credit_wallet = CreditWallet(wallet_repo)
+    fake_bus = FakeEventBus()
     create_order = CreateOrder(
         order_repo,
         product_repo,
         wallet_repo,
         idem_repo,
+        fake_bus,
     )
     refund_order = RefundOrder(
         order_repo,
         product_repo,
         wallet_repo,
         idem_repo,
+        fake_bus,
     )
 
     # setup product
@@ -70,6 +75,8 @@ def test_refund_order_idempotent():
     # assertions
     assert refunded_1.id == refunded_2.id
     assert refunded_1.status == OrderStatus.REFUNDED
+    # ensure an OrderRefunded event was published
+    assert any(isinstance(e, OrderRefunded) for e in fake_bus.published_events)
 
     wallet = wallet_repo.get_wallet("tenant_1", "user_1")
     assert wallet.balance.amount == 100  # refunded

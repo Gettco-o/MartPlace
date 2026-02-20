@@ -14,7 +14,7 @@ class Product:
             if quantity < 0:
                   raise DomainError("Quantity must be positive")
             if self.stock < quantity:
-                  raise DomainError("Insufficent stock")
+                  raise DomainError("Insufficient stock")
             
             self.stock -= quantity
 
