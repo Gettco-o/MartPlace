@@ -1,0 +1,126 @@
+import pytest
+
+from app.domain.exceptions import DomainError
+from app.domain.value_objects.money import Money
+from app.use_cases.product.create_product import CreateProduct
+from app.use_cases.tenant.create_tenant import CreateTenant
+from app.use_cases.tenant.suspend_tenant import SuspendTenant
+from tests.fakes.fake_product_repository import FakeProductRepository
+from tests.fakes.fake_tenant_repository import FakeTenantRepository
+
+
+def test_create_product_success():
+    tenant_repo = FakeTenantRepository()
+    product_repo = FakeProductRepository()
+
+    create_tenant = CreateTenant(tenant_repo)
+    use_case = CreateProduct(product_repo, tenant_repo)
+
+    tenant = create_tenant.execute(name="Shop A")
+
+    product = use_case.execute(
+        tenant_id=tenant.id,
+        name="Plaster Powder",
+        price=Money(1500),
+        stock=12,
+    )
+
+    assert product.id is not None
+    assert product.tenant_id == tenant.id
+    assert product.name == "Plaster Powder"
+    assert product.price == Money(1500)
+    assert product.stock == 12
+    assert product_repo.get_by_id(tenant.id, product.id) == product
+
+
+def test_create_product_duplicate_name_raises():
+    tenant_repo = FakeTenantRepository()
+    product_repo = FakeProductRepository()
+
+    create_tenant = CreateTenant(tenant_repo)
+    use_case = CreateProduct(product_repo, tenant_repo)
+
+    tenant = create_tenant.execute(name="Shop A")
+
+    use_case.execute(
+        tenant_id=tenant.id,
+        name="Plaster Powder",
+        price=Money(1000),
+        stock=10,
+    )
+
+    with pytest.raises(DomainError, match="Product name already in use"):
+        use_case.execute(
+            tenant_id=tenant.id,
+            name="Plaster Powder",
+            price=Money(1200),
+            stock=5,
+        )
+
+
+def test_create_product_missing_tenant_raises():
+    tenant_repo = FakeTenantRepository()
+    product_repo = FakeProductRepository()
+    use_case = CreateProduct(product_repo, tenant_repo)
+
+    with pytest.raises(DomainError, match="Tenant not found"):
+        use_case.execute(
+            tenant_id="missing",
+            name="Plaster Powder",
+            price=Money(1000),
+            stock=10,
+        )
+
+
+def test_create_product_inactive_tenant_raises():
+    tenant_repo = FakeTenantRepository()
+    product_repo = FakeProductRepository()
+
+    create_tenant = CreateTenant(tenant_repo)
+    suspend_tenant = SuspendTenant(tenant_repo)
+    use_case = CreateProduct(product_repo, tenant_repo)
+
+    tenant = create_tenant.execute(name="Shop A")
+    suspend_tenant.execute(tenant.id)
+
+    with pytest.raises(DomainError, match="Tenant is not active"):
+        use_case.execute(
+            tenant_id=tenant.id,
+            name="Plaster Powder",
+            price=Money(1000),
+            stock=10,
+        )
+
+
+def test_create_product_invalid_values_raise():
+    tenant_repo = FakeTenantRepository()
+    product_repo = FakeProductRepository()
+
+    create_tenant = CreateTenant(tenant_repo)
+    use_case = CreateProduct(product_repo, tenant_repo)
+
+    tenant = create_tenant.execute(name="Shop A")
+
+    with pytest.raises(DomainError, match="Product name cannot be empty"):
+        use_case.execute(
+            tenant_id=tenant.id,
+            name="  ",
+            price=Money(1000),
+            stock=10,
+        )
+
+    with pytest.raises(DomainError, match="Price must be greater than zero"):
+        use_case.execute(
+            tenant_id=tenant.id,
+            name="Plaster Powder",
+            price=Money(0),
+            stock=10,
+        )
+
+    with pytest.raises(DomainError, match="Stock cannot be negative"):
+        use_case.execute(
+            tenant_id=tenant.id,
+            name="Plaster Powder",
+            price=Money(1000),
+            stock=-1,
+        )

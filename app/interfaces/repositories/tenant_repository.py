@@ -10,4 +10,7 @@ class TenantRepository(ABC):
       @abstractmethod
       def get_by_id(self, tenant_id: str) -> Tenant | None:
             pass
-      
+
+      @abstractmethod
+      def get_by_name(self, tenant_name: str) -> Tenant | None:
+            pass

@@ -10,3 +10,9 @@ class FakeTenantRepository(TenantRepository):
 
       def get_by_id(self, tenant_id: str) -> Tenant | None:
             return self.tenants.get(tenant_id)
+      
+      def get_by_name(self, tenant_name: str) -> Tenant | None:
+            for tenant in self.tenants.values():
+                  if tenant.name == tenant_name:
+                        return tenant
+            return None

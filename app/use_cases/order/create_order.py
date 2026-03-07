@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from app.domain.entities.order import Order
 from app.domain.value_objects.money import Money
+from app.domain.value_objects.order_item import OrderItem
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
@@ -21,7 +22,7 @@ class CreateOrder:
       tenant_repo: TenantRepository
       event_bus: EventBus
 
-      def execute(self, tenant_id: str, user_id: str, products: dict[str, int], idempotency_key: str) -> Order:
+      def execute(self, tenant_id: str, user_id: str, items: list[OrderItem], idempotency_key: str) -> Order:
 
             tenant = self.tenant_repo.get_by_id(tenant_id)
             if not tenant:
@@ -37,16 +38,16 @@ class CreateOrder:
 
             total_amount = Money(0)
             product_entities = []
-            for product_id, quantity in products.items():
-                  product = self.product_repo.get_by_id(tenant_id, product_id)
+            for item in items:
+                  product = self.product_repo.get_by_id(tenant_id, item.product_id)
 
                   if not product:
-                        raise DomainError(f"Product {product_id} does not exist.")
+                        raise DomainError(f"Product {item.product_id} does not exist.")
                   
-                  product.reduce_stock(quantity)
+                  product.reduce_stock(item.quantity)
                   product_entities.append(product)
                   
-                  total_amount = total_amount.add(product.price.multiply(quantity))
+                  total_amount = total_amount.add(item.total())
             
             wallet = self.wallet_repo.get_wallet(tenant_id, user_id)
             if wallet is None:
@@ -58,7 +59,7 @@ class CreateOrder:
                   id = str(uuid.uuid4()),
                   tenant_id = tenant_id,
                   user_id = user_id,
-                  products = products,
+                  items = items,
                   amount = total_amount,
             )
             order.mark_paid()

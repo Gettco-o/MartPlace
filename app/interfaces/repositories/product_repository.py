@@ -9,3 +9,7 @@ class ProductRepository(ABC):
       @abstractmethod
       def save(self, product):
             pass
+
+      @abstractmethod
+      def exists_by_name(self, tenant_id: str, name: str) -> bool: 
+            pass

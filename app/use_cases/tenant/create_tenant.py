@@ -14,10 +14,12 @@ class CreateTenant:
 
         if not name or not name.strip():
             raise DomainError("Tenant name cannot be empty")
+        if self.tenant_repo.get_by_name(name):
+                  raise DomainError("Name already in use")
 
         tenant = Tenant(
             id=str(uuid.uuid4()),
-            name=name.strip(),
+            name=name.strip()
         )
 
         self.tenant_repo.save(tenant)

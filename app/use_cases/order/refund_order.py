@@ -36,14 +36,11 @@ class RefundOrder:
             order = self.order_repo.get_by_id(tenant_id, order_id)
             if not order:
                   raise DomainError("Order not found")
-            
-            if not order.can_refund():
-                  raise DomainError("Order cannot be refunded")
                         
             # Restore stock
-            for product_id, quantity in order.products.items():
-                  product = self.product_repo.get_by_id(tenant_id, product_id)
-                  product.increase_stock(quantity)
+            for item in order.items:
+                  product = self.product_repo.get_by_id(tenant_id, item.product_id)
+                  product.increase_stock(item.quantity)
                   self.product_repo.save(product)
 
             # Credit wallet

@@ -9,6 +9,7 @@ from app.domain.events.order_refunded import OrderRefunded
 from tests.fakes.fake_idempotency_repository import FakeIdempotencyRepository
 from tests.fakes.fake_order_repository import FakeOrderRepository
 from tests.fakes.fake_product_repository import FakeProductRepository
+from tests.fakes.fake_tenant_repository import FakeTenantRepository
 from tests.fakes.fake_wallet_repository import FakeWalletRepository
 
 
@@ -18,9 +19,10 @@ def test_refund_order_idempotent():
     product_repo = FakeProductRepository()
     order_repo = FakeOrderRepository()
     idem_repo = FakeIdempotencyRepository()
+    tenant_repo = FakeTenantRepository()
 
     # use cases
-    credit_wallet = CreditWallet(wallet_repo)
+    credit_wallet = CreditWallet(wallet_repo, tenant_repo)
     fake_bus = FakeEventBus()
     create_order = CreateOrder(
         order_repo,

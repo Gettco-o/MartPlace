@@ -4,12 +4,14 @@ from app.use_cases.wallet.credit_wallet import CreditWallet
 from app.use_cases.wallet.debit_wallet import DebitWallet
 from app.domain.exceptions import InsufficientFundsError
 from app.domain.exceptions import InvalidAmountError
+from tests.fakes.fake_tenant_repository import FakeTenantRepository
 from tests.fakes.fake_wallet_repository import FakeWalletRepository
 
 def test_debit_wallet_success():
-      repo = FakeWalletRepository()
-      credit_use_case = CreditWallet(wallet_repository=repo)
-      debit_use_case = DebitWallet(wallet_repository=repo)
+      wallet_repo = FakeWalletRepository()
+      tenant_repo = FakeTenantRepository()
+      credit_use_case = CreditWallet(wallet_repository=wallet_repo, tenant_repository=tenant_repo)
+      debit_use_case = DebitWallet(wallet_repository=wallet_repo, tenant_repository=tenant_repo)
 
       credit_use_case.execute("tenant_1", "user_1", Money(100))
       wallet = debit_use_case.execute("tenant_1", "user_1", Money(40))
@@ -17,9 +19,10 @@ def test_debit_wallet_success():
       assert wallet.balance == Money(60)
 
 def test_debit_wallet_insufficient_funds():
-      repo = FakeWalletRepository()
-      credit_use_case = CreditWallet(wallet_repository=repo)
-      debit_use_case = DebitWallet(wallet_repository=repo)
+      wallet_repo = FakeWalletRepository()
+      tenant_repo = FakeTenantRepository()
+      credit_use_case = CreditWallet(wallet_repository=wallet_repo, tenant_repository=tenant_repo)
+      debit_use_case = DebitWallet(wallet_repository=wallet_repo, tenant_repository=tenant_repo)
 
       credit_use_case.execute("tenant_1", "user_1", Money(10))
 
@@ -27,9 +30,10 @@ def test_debit_wallet_insufficient_funds():
             debit_use_case.execute("tenant_1", "user_1", Money(20))
 
 def test_debit_wallet_invalid_amount():
-      repo = FakeWalletRepository()
-      credit_use_case = CreditWallet(repo)
-      debit_use_case = DebitWallet(repo)
+      wallet_repo = FakeWalletRepository()
+      tenant_repo = FakeTenantRepository()
+      credit_use_case = CreditWallet(wallet_repository=wallet_repo, tenant_repository=tenant_repo)
+      debit_use_case = DebitWallet(wallet_repository=wallet_repo, tenant_repository=tenant_repo)
 
       credit_use_case.execute("tenant_1", "user_1", Money(100))
 
