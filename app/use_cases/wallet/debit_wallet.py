@@ -2,7 +2,9 @@ from app.domain.exceptions import DomainError
 from dataclasses import dataclass
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.tenant_repository import TenantRepository
+from app.interfaces.repositories.user_repository import UserRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
+from app.use_cases.auth import ensure_active_buyer
 from app.domain.value_objects.money import Money
 import uuid
 
@@ -11,10 +13,12 @@ import uuid
 class DebitWallet:
     wallet_repository: WalletRepository
     tenant_repository: TenantRepository
+    user_repository: UserRepository
     event_bus: EventBus
 
     def execute(
         self,
+        actor_user_id: str,
         tenant_id: str,
         user_id: str,
         amount: Money,
@@ -25,6 +29,7 @@ class DebitWallet:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
+        ensure_active_buyer(self.user_repository, actor_user_id, user_id)
 
         wallet = self.wallet_repository.get_wallet(tenant_id, user_id)
 

@@ -6,8 +6,8 @@ from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
+from app.interfaces.repositories.user_repository import UserRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
-from app.domain.exceptions import DomainError
 from app.interfaces.repositories.idempotency_repository import IdempotencyRepository
 from app.domain.value_objects.idempotent_operation import IdempotentOperation
 from app.domain.entities.idempotency import IdempotencyRecord
@@ -20,6 +20,7 @@ class CreateOrder:
     wallet_repo: WalletRepository
     idempotency_repo: IdempotencyRepository
     tenant_repo: TenantRepository
+    user_repo: UserRepository
     event_bus: EventBus
     place_order: PlaceOrder = field(init=False)
 
@@ -29,11 +30,13 @@ class CreateOrder:
             product_repo=self.product_repo,
             wallet_repo=self.wallet_repo,
             tenant_repo=self.tenant_repo,
+            user_repo=self.user_repo,
             event_bus=self.event_bus,
         )
 
     def execute(
         self,
+        actor_user_id: str,
         tenant_id: str,
         user_id: str,
         items: list[OrderItem],
@@ -46,6 +49,7 @@ class CreateOrder:
             return self.order_repo.get_by_id(tenant_id, existing.result_id)
 
         order = self.place_order.execute(
+            actor_user_id=actor_user_id,
             tenant_id=tenant_id,
             user_id=user_id,
             items=items,

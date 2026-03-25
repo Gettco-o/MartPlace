@@ -13,6 +13,7 @@ from app.interfaces.repositories.idempotency_repository import IdempotencyReposi
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
+from app.interfaces.repositories.user_repository import UserRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
 from app.use_cases.order.place_order import PlaceOrder
 
@@ -24,6 +25,7 @@ class CheckoutCart:
     wallet_repo: WalletRepository
     idempotency_repo: IdempotencyRepository
     tenant_repo: TenantRepository
+    user_repo: UserRepository
     event_bus: EventBus
     place_order: PlaceOrder = field(init=False)
 
@@ -33,10 +35,11 @@ class CheckoutCart:
             product_repo=self.product_repo,
             wallet_repo=self.wallet_repo,
             tenant_repo=self.tenant_repo,
+            user_repo=self.user_repo,
             event_bus=self.event_bus,
         )
 
-    def execute(self, user_id: str, idempotency_key: str) -> list[Order]:
+    def execute(self, actor_user_id: str, user_id: str, idempotency_key: str) -> list[Order]:
 
         operation = IdempotentOperation.CHECKOUT_CART
         existing = self.idempotency_repo.get(idempotency_key, operation)
@@ -72,6 +75,7 @@ class CheckoutCart:
                 )
 
             order = self.place_order.execute(
+                actor_user_id=actor_user_id,
                 tenant_id=tenant_id,
                 user_id=user_id,
                 items=order_items,

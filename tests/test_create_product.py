@@ -9,19 +9,25 @@ from app.use_cases.tenant.suspend_tenant import SuspendTenant
 from tests.fakes.fake_event_bus import FakeEventBus
 from tests.fakes.fake_product_repository import FakeProductRepository
 from tests.fakes.fake_tenant_repository import FakeTenantRepository
+from tests.fakes.fake_user_repository import FakeUserRepository
+from tests.helpers import make_platform_admin, make_tenant_user
 
 
 def test_create_product_success():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    user_repo = FakeUserRepository()
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
-    use_case = CreateProduct(product_repo, tenant_repo, fake_bus)
+    use_case = CreateProduct(product_repo, tenant_repo, user_repo, fake_bus)
 
     tenant = create_tenant.execute(name="Shop A")
+    tenant_user = make_tenant_user(tenant.id)
+    user_repo.save(tenant_user)
 
     product = use_case.execute(
+        actor_user_id=tenant_user.id,
         tenant_id=tenant.id,
         name="Plaster Powder",
         price=Money(1500),
@@ -40,14 +46,18 @@ def test_create_product_success():
 def test_create_product_duplicate_name_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    user_repo = FakeUserRepository()
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
-    use_case = CreateProduct(product_repo, tenant_repo, fake_bus)
+    use_case = CreateProduct(product_repo, tenant_repo, user_repo, fake_bus)
 
     tenant = create_tenant.execute(name="Shop A")
+    tenant_user = make_tenant_user(tenant.id)
+    user_repo.save(tenant_user)
 
     use_case.execute(
+        actor_user_id=tenant_user.id,
         tenant_id=tenant.id,
         name="Plaster Powder",
         price=Money(1000),
@@ -56,6 +66,7 @@ def test_create_product_duplicate_name_raises():
 
     with pytest.raises(DomainError, match="Product name already in use"):
         use_case.execute(
+            actor_user_id=tenant_user.id,
             tenant_id=tenant.id,
             name="Plaster Powder",
             price=Money(1200),
@@ -66,10 +77,14 @@ def test_create_product_duplicate_name_raises():
 def test_create_product_missing_tenant_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
-    use_case = CreateProduct(product_repo, tenant_repo, FakeEventBus())
+    user_repo = FakeUserRepository()
+    actor = make_tenant_user("tenant-1")
+    user_repo.save(actor)
+    use_case = CreateProduct(product_repo, tenant_repo, user_repo, FakeEventBus())
 
     with pytest.raises(DomainError, match="Tenant not found"):
         use_case.execute(
+            actor_user_id=actor.id,
             tenant_id="missing",
             name="Plaster Powder",
             price=Money(1000),
@@ -80,17 +95,23 @@ def test_create_product_missing_tenant_raises():
 def test_create_product_inactive_tenant_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    user_repo = FakeUserRepository()
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
-    suspend_tenant = SuspendTenant(tenant_repo, fake_bus)
-    use_case = CreateProduct(product_repo, tenant_repo, fake_bus)
+    platform_admin = make_platform_admin()
+    user_repo.save(platform_admin)
+    suspend_tenant = SuspendTenant(tenant_repo, user_repo, fake_bus)
+    use_case = CreateProduct(product_repo, tenant_repo, user_repo, fake_bus)
 
     tenant = create_tenant.execute(name="Shop A")
-    suspend_tenant.execute(tenant.id)
+    tenant_user = make_tenant_user(tenant.id)
+    user_repo.save(tenant_user)
+    suspend_tenant.execute(platform_admin.id, tenant.id)
 
     with pytest.raises(DomainError, match="Tenant is not active"):
         use_case.execute(
+            actor_user_id=tenant_user.id,
             tenant_id=tenant.id,
             name="Plaster Powder",
             price=Money(1000),
@@ -101,15 +122,19 @@ def test_create_product_inactive_tenant_raises():
 def test_create_product_invalid_values_raise():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    user_repo = FakeUserRepository()
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
-    use_case = CreateProduct(product_repo, tenant_repo, fake_bus)
+    use_case = CreateProduct(product_repo, tenant_repo, user_repo, fake_bus)
 
     tenant = create_tenant.execute(name="Shop A")
+    tenant_user = make_tenant_user(tenant.id)
+    user_repo.save(tenant_user)
 
     with pytest.raises(DomainError, match="Product name cannot be empty"):
         use_case.execute(
+            actor_user_id=tenant_user.id,
             tenant_id=tenant.id,
             name="  ",
             price=Money(1000),
@@ -118,6 +143,7 @@ def test_create_product_invalid_values_raise():
 
     with pytest.raises(DomainError, match="Price must be greater than zero"):
         use_case.execute(
+            actor_user_id=tenant_user.id,
             tenant_id=tenant.id,
             name="Plaster Powder",
             price=Money(0),
@@ -126,6 +152,7 @@ def test_create_product_invalid_values_raise():
 
     with pytest.raises(DomainError, match="Stock cannot be negative"):
         use_case.execute(
+            actor_user_id=tenant_user.id,
             tenant_id=tenant.id,
             name="Plaster Powder",
             price=Money(1000),

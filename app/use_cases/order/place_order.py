@@ -9,7 +9,9 @@ from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
+from app.interfaces.repositories.user_repository import UserRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
+from app.use_cases.auth import ensure_active_buyer
 
 
 @dataclass
@@ -18,17 +20,26 @@ class PlaceOrder:
     product_repo: ProductRepository
     wallet_repo: WalletRepository
     tenant_repo: TenantRepository
+    user_repo: UserRepository
     event_bus: EventBus
 
-    def execute(self, tenant_id: str, user_id: str, items: list[OrderItem]) -> Order:
+    def execute(
+        self,
+        actor_user_id: str,
+        tenant_id: str,
+        user_id: str,
+        items: list[OrderItem],
+    ) -> Order:
         tenant = self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
+        ensure_active_buyer(self.user_repo, actor_user_id, user_id)
 
         total_amount = Money(0)
         product_entities = []
+        normalized_items = []
         for item in items:
             product = self.product_repo.get_by_id(tenant_id, item.product_id)
 
@@ -37,7 +48,13 @@ class PlaceOrder:
 
             product.reduce_stock(item.quantity)
             product_entities.append(product)
-            total_amount = total_amount.add(item.total())
+            normalized_item = OrderItem(
+                product_id=product.id,
+                quantity=item.quantity,
+                unit_price=product.price,
+            )
+            normalized_items.append(normalized_item)
+            total_amount = total_amount.add(normalized_item.total())
 
         wallet = self.wallet_repo.get_wallet(tenant_id, user_id)
         if wallet is None:
@@ -47,7 +64,7 @@ class PlaceOrder:
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
             user_id=user_id,
-            items=items,
+            items=normalized_items,
             amount=total_amount,
         )
         wallet_entry = wallet.debit(total_amount, reference_id=order.id)

@@ -8,16 +8,20 @@ from app.domain.value_objects.money import Money
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
+from app.interfaces.repositories.user_repository import UserRepository
+from app.use_cases.auth import ensure_tenant_manager
 
 
 @dataclass
 class UpdateProduct:
     product_repo: ProductRepository
     tenant_repo: TenantRepository
+    user_repo: UserRepository
     event_bus: EventBus
 
     def execute(
         self,
+        actor_user_id: str,
         tenant_id: str,
         product_id: str,
         name: str,
@@ -29,6 +33,7 @@ class UpdateProduct:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
+        ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
 
         product = self.product_repo.get_by_id(tenant_id, product_id)
         if not product:

@@ -2,14 +2,18 @@ from dataclasses import dataclass
 from app.domain.entities.tenant import Tenant
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.tenant_repository import TenantRepository
+from app.interfaces.repositories.user_repository import UserRepository
+from app.use_cases.auth import ensure_platform_admin
 from app.domain.exceptions import DomainError
 
 @dataclass
 class SuspendTenant:
     tenant_repo: TenantRepository
+    user_repo: UserRepository
     event_bus: EventBus
 
-    def execute(self, tenant_id: str) -> Tenant:
+    def execute(self, actor_user_id: str, tenant_id: str) -> Tenant:
+        ensure_platform_admin(self.user_repo, actor_user_id)
         tenant = self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
