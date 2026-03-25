@@ -83,9 +83,6 @@ class CheckoutCart:
             if not wallet:
                 raise DomainError("Wallet not found")
 
-            wallet.debit(total)
-            self.wallet_repo.save(wallet)
-
             order = Order(
                 id=str(uuid.uuid4()),
                 tenant_id=tenant_id,
@@ -93,10 +90,13 @@ class CheckoutCart:
                 items=order_items,
                 amount=total,
             )
+            wallet_entry = wallet.debit(total, reference_id=order.id)
             order.mark_paid()
 
+            self.wallet_repo.append_entry(wallet_entry)
             self.order_repo.save(order)
-            self.event_bus.publish(order.events)
+            self.event_bus.publish([*wallet.events, *order.events])
+            wallet.clear_events()
             order.clear_events()
             created_orders.append(order)
 

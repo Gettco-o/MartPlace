@@ -12,56 +12,56 @@ from app.interfaces.repositories.wallet_repository import WalletRepository
 
 @dataclass
 class RefundOrder:
-      order_repo: OrderRepository
-      product_repo: ProductRepository
-      wallet_repo: WalletRepository
-      idempotency_repo: IdempotencyRepository
-      tenant_repo: TenantRepository
-      event_bus: EventBus
+    order_repo: OrderRepository
+    product_repo: ProductRepository
+    wallet_repo: WalletRepository
+    idempotency_repo: IdempotencyRepository
+    tenant_repo: TenantRepository
+    event_bus: EventBus
 
-      def execute(self, tenant_id: str, order_id: str, idempotency_key: str):
+    def execute(self, tenant_id: str, order_id: str, idempotency_key: str):
+        tenant = self.tenant_repo.get_by_id(tenant_id)
+        if not tenant:
+            raise DomainError("Tenant not found")
 
-            tenant = self.tenant_repo.get_by_id(tenant_id)
-            if not tenant:
-                  raise DomainError("Tenant not found")
-            
-            tenant.ensure_active()
+        tenant.ensure_active()
 
-            operation = IdempotentOperation.REFUND_ORDER
+        operation = IdempotentOperation.REFUND_ORDER
 
-            existing = self.idempotency_repo.get(idempotency_key, operation)
-            if existing:
-                  return self.order_repo.get_by_id(tenant_id, order_id)
-            
-            order = self.order_repo.get_by_id(tenant_id, order_id)
-            if not order:
-                  raise DomainError("Order not found")
-                        
-            # Restore stock
-            for item in order.items:
-                  product = self.product_repo.get_by_id(tenant_id, item.product_id)
-                  product.increase_stock(item.quantity)
-                  self.product_repo.save(product)
+        existing = self.idempotency_repo.get(idempotency_key, operation)
+        if existing:
+            return self.order_repo.get_by_id(tenant_id, order_id)
 
-            # Credit wallet
-            wallet = self.wallet_repo.get_wallet(tenant_id, order.user_id)
-            wallet.credit(order.amount)
-            self.wallet_repo.save(wallet)
+        order = self.order_repo.get_by_id(tenant_id, order_id)
+        if not order:
+            raise DomainError("Order not found")
 
-            # Update order
-            order.mark_refunded()
-            self.order_repo.save(order)
+        for item in order.items:
+            product = self.product_repo.get_by_id(tenant_id, item.product_id)
+            product.increase_stock(item.quantity)
+            self.product_repo.save(product)
 
-            # Save idempotency record LAST
-            self.idempotency_repo.save(
-                  IdempotencyRecord(
-                  key=idempotency_key,
-                  operation=operation,
-                  result_id=order.id,
-                  )
+        wallet = self.wallet_repo.get_wallet(tenant_id, order.user_id)
+        if wallet is None:
+            raise DomainError("Wallet does not exist")
+
+        wallet_entry = wallet.credit(order.amount, reference_id=f"refund:{order.id}")
+
+        order.mark_refunded()
+
+        self.wallet_repo.append_entry(wallet_entry)
+        self.order_repo.save(order)
+
+        self.idempotency_repo.save(
+            IdempotencyRecord(
+                key=idempotency_key,
+                operation=operation,
+                result_id=order.id,
             )
+        )
 
-            self.event_bus.publish(order.events)
-            order.clear_events()
+        self.event_bus.publish([*wallet.events, *order.events])
+        wallet.clear_events()
+        order.clear_events()
 
-            return order
+        return order

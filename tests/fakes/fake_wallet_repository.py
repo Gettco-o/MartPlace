@@ -1,14 +1,31 @@
+from app.domain.entities.ledger_entry import LedgerEntry
 from app.interfaces.repositories.wallet_repository import WalletRepository
 from app.domain.entities.wallet import Wallet
+
 
 class FakeWalletRepository(WalletRepository):
 
     def __init__(self):
-        self.wallets: dict[tuple[str,str], Wallet] = {}
+        self.entries: dict[tuple[str, str], list[LedgerEntry]] = {}
 
-    def get_wallet(self, tenant_id: str, user_id: str)-> Wallet:
-        return self.wallets.get((tenant_id, user_id))
+    def get_wallet(self, tenant_id: str, user_id: str) -> Wallet | None:
+        key = (tenant_id, user_id)
+        if key not in self.entries:
+            return None
 
-    def save(self, wallet):
-        key = (wallet.tenant_id, wallet.user_id)
-        self.wallets[key] = wallet
+        return Wallet(
+            tenant_id=tenant_id,
+            user_id=user_id,
+            entries=list(self.entries[key]),
+        )
+
+    def append_entry(self, entry: LedgerEntry) -> None:
+        key = (entry.tenant_id, entry.user_id)
+        self.entries.setdefault(key, []).append(entry)
+
+    def has_reference(self, tenant_id: str, user_id: str, reference_id: str) -> bool:
+        key = (tenant_id, user_id)
+        return any(
+            entry.reference_id == reference_id
+            for entry in self.entries.get(key, [])
+        )

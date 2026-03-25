@@ -15,70 +15,74 @@ import uuid
 
 @dataclass
 class CreateOrder:
-      order_repo: OrderRepository
-      product_repo: ProductRepository
-      wallet_repo: WalletRepository
-      idempotency_repo: IdempotencyRepository
-      tenant_repo: TenantRepository
-      event_bus: EventBus
+    order_repo: OrderRepository
+    product_repo: ProductRepository
+    wallet_repo: WalletRepository
+    idempotency_repo: IdempotencyRepository
+    tenant_repo: TenantRepository
+    event_bus: EventBus
 
-      def execute(self, tenant_id: str, user_id: str, items: list[OrderItem], idempotency_key: str) -> Order:
+    def execute(
+        self,
+        tenant_id: str,
+        user_id: str,
+        items: list[OrderItem],
+        idempotency_key: str,
+    ) -> Order:
+        tenant = self.tenant_repo.get_by_id(tenant_id)
+        if not tenant:
+            raise DomainError("Tenant not found")
 
-            tenant = self.tenant_repo.get_by_id(tenant_id)
-            if not tenant:
-                  raise DomainError("Tenant not found")
+        tenant.ensure_active()
 
-            tenant.ensure_active()
+        operation = IdempotentOperation.CREATE_ORDER
 
-            operation = IdempotentOperation.CREATE_ORDER
+        existing = self.idempotency_repo.get(idempotency_key, operation)
+        if existing:
+            return self.order_repo.get_by_id(tenant_id, existing.result_id)
 
-            existing = self.idempotency_repo.get(idempotency_key, operation)
-            if existing:
-                  return self.order_repo.get_by_id(tenant_id, existing.result_id)
+        total_amount = Money(0)
+        product_entities = []
+        for item in items:
+            product = self.product_repo.get_by_id(tenant_id, item.product_id)
 
-            total_amount = Money(0)
-            product_entities = []
-            for item in items:
-                  product = self.product_repo.get_by_id(tenant_id, item.product_id)
+            if not product:
+                raise DomainError(f"Product {item.product_id} does not exist.")
 
-                  if not product:
-                        raise DomainError(f"Product {item.product_id} does not exist.")
-                  
-                  product.reduce_stock(item.quantity)
-                  product_entities.append(product)
-                  
-                  total_amount = total_amount.add(item.total())
-            
-            wallet = self.wallet_repo.get_wallet(tenant_id, user_id)
-            if wallet is None:
-                  raise DomainError("Wallet does not exist")
+            product.reduce_stock(item.quantity)
+            product_entities.append(product)
+            total_amount = total_amount.add(item.total())
 
-            wallet.debit(total_amount)
+        wallet = self.wallet_repo.get_wallet(tenant_id, user_id)
+        if wallet is None:
+            raise DomainError("Wallet does not exist")
 
-            order = Order(
-                  id = str(uuid.uuid4()),
-                  tenant_id = tenant_id,
-                  user_id = user_id,
-                  items = items,
-                  amount = total_amount,
+        order = Order(
+            id=str(uuid.uuid4()),
+            tenant_id=tenant_id,
+            user_id=user_id,
+            items=items,
+            amount=total_amount,
+        )
+        wallet_entry = wallet.debit(total_amount, reference_id=order.id)
+        order.mark_paid()
+
+        for product in product_entities:
+            self.product_repo.save(product)
+
+        self.wallet_repo.append_entry(wallet_entry)
+        self.order_repo.save(order)
+
+        self.idempotency_repo.save(
+            IdempotencyRecord(
+                key=idempotency_key,
+                operation=operation,
+                result_id=order.id,
             )
-            order.mark_paid()
+        )
 
-            for product in product_entities:
-                  self.product_repo.save(product)
+        self.event_bus.publish([*wallet.events, *order.events])
+        wallet.clear_events()
+        order.clear_events()
 
-            self.wallet_repo.save(wallet)
-            self.order_repo.save(order)
-
-            self.idempotency_repo.save(
-                  IdempotencyRecord(
-                        key=idempotency_key,
-                        operation=operation,
-                        result_id=order.id
-                  )
-            )
-
-            self.event_bus.publish(order.events)
-            order.clear_events()
-
-            return order
+        return order
