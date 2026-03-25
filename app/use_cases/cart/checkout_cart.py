@@ -1,19 +1,20 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from collections import defaultdict
+
 from app.domain.entities.idempotency import IdempotencyRecord
 from app.domain.entities.order import Order
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.idempotent_operation import IdempotentOperation
-from app.domain.value_objects.money import Money
 from app.domain.value_objects.order_item import OrderItem
-import uuid
 
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.cart_repository import CartRepository
 from app.interfaces.repositories.idempotency_repository import IdempotencyRepository
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
+from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
+from app.use_cases.order.place_order import PlaceOrder
 
 @dataclass
 class CheckoutCart:
@@ -22,7 +23,18 @@ class CheckoutCart:
     order_repo: OrderRepository
     wallet_repo: WalletRepository
     idempotency_repo: IdempotencyRepository
+    tenant_repo: TenantRepository
     event_bus: EventBus
+    place_order: PlaceOrder = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.place_order = PlaceOrder(
+            order_repo=self.order_repo,
+            product_repo=self.product_repo,
+            wallet_repo=self.wallet_repo,
+            tenant_repo=self.tenant_repo,
+            event_bus=self.event_bus,
+        )
 
     def execute(self, user_id: str, idempotency_key: str) -> list[Order]:
 
@@ -47,64 +59,28 @@ class CheckoutCart:
 
         created_orders = []
 
-        # 3️⃣ Process each tenant separately
         for tenant_id, items in grouped.items():
-
             order_items = []
-            total = Money(0)
 
             for cart_item in items:
-                product = self.product_repo.get_by_id(
-                    tenant_id,
-                    cart_item.product_id
+                order_items.append(
+                    OrderItem(
+                        product_id=cart_item.product_id,
+                        quantity=cart_item.quantity,
+                        unit_price=cart_item.unit_price,
+                    )
                 )
 
-                if not product:
-                    raise DomainError("Product not found")
-
-                if product.stock < cart_item.quantity:
-                    raise DomainError("Insufficient stock")
-
-                # Reduce stock
-                product.reduce_stock(cart_item.quantity)
-                self.product_repo.save(product)
-
-                order_item = OrderItem(
-                    product_id=cart_item.product_id,
-                    quantity=cart_item.quantity,
-                    unit_price=cart_item.unit_price
-                )
-
-                order_items.append(order_item)
-                total = total.add(order_item.total())
-
-            # Debit wallet per tenant order
-            wallet = self.wallet_repo.get_wallet(tenant_id, user_id)
-            if not wallet:
-                raise DomainError("Wallet not found")
-
-            order = Order(
-                id=str(uuid.uuid4()),
+            order = self.place_order.execute(
                 tenant_id=tenant_id,
                 user_id=user_id,
                 items=order_items,
-                amount=total,
             )
-            wallet_entry = wallet.debit(total, reference_id=order.id)
-            order.mark_paid()
-
-            self.wallet_repo.append_entry(wallet_entry)
-            self.order_repo.save(order)
-            self.event_bus.publish([*wallet.events, *order.events])
-            wallet.clear_events()
-            order.clear_events()
             created_orders.append(order)
 
-        # 4️⃣ Clear cart only after success
         cart.clear()
         self.cart_repo.save(cart)
 
-        # 5️⃣ Store idempotent result
         self.idempotency_repo.save(
             IdempotencyRecord(
                 key=idempotency_key,

@@ -1,6 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+
 from app.domain.entities.order import Order
-from app.domain.value_objects.money import Money
 from app.domain.value_objects.order_item import OrderItem
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.order_repository import OrderRepository
@@ -11,7 +11,7 @@ from app.domain.exceptions import DomainError
 from app.interfaces.repositories.idempotency_repository import IdempotencyRepository
 from app.domain.value_objects.idempotent_operation import IdempotentOperation
 from app.domain.entities.idempotency import IdempotencyRecord
-import uuid
+from app.use_cases.order.place_order import PlaceOrder
 
 @dataclass
 class CreateOrder:
@@ -21,6 +21,16 @@ class CreateOrder:
     idempotency_repo: IdempotencyRepository
     tenant_repo: TenantRepository
     event_bus: EventBus
+    place_order: PlaceOrder = field(init=False)
+
+    def __post_init__(self) -> None:
+        self.place_order = PlaceOrder(
+            order_repo=self.order_repo,
+            product_repo=self.product_repo,
+            wallet_repo=self.wallet_repo,
+            tenant_repo=self.tenant_repo,
+            event_bus=self.event_bus,
+        )
 
     def execute(
         self,
@@ -29,49 +39,17 @@ class CreateOrder:
         items: list[OrderItem],
         idempotency_key: str,
     ) -> Order:
-        tenant = self.tenant_repo.get_by_id(tenant_id)
-        if not tenant:
-            raise DomainError("Tenant not found")
-
-        tenant.ensure_active()
-
         operation = IdempotentOperation.CREATE_ORDER
 
         existing = self.idempotency_repo.get(idempotency_key, operation)
         if existing:
             return self.order_repo.get_by_id(tenant_id, existing.result_id)
 
-        total_amount = Money(0)
-        product_entities = []
-        for item in items:
-            product = self.product_repo.get_by_id(tenant_id, item.product_id)
-
-            if not product:
-                raise DomainError(f"Product {item.product_id} does not exist.")
-
-            product.reduce_stock(item.quantity)
-            product_entities.append(product)
-            total_amount = total_amount.add(item.total())
-
-        wallet = self.wallet_repo.get_wallet(tenant_id, user_id)
-        if wallet is None:
-            raise DomainError("Wallet does not exist")
-
-        order = Order(
-            id=str(uuid.uuid4()),
+        order = self.place_order.execute(
             tenant_id=tenant_id,
             user_id=user_id,
             items=items,
-            amount=total_amount,
         )
-        wallet_entry = wallet.debit(total_amount, reference_id=order.id)
-        order.mark_paid()
-
-        for product in product_entities:
-            self.product_repo.save(product)
-
-        self.wallet_repo.append_entry(wallet_entry)
-        self.order_repo.save(order)
 
         self.idempotency_repo.save(
             IdempotencyRecord(
@@ -80,9 +58,5 @@ class CreateOrder:
                 result_id=order.id,
             )
         )
-
-        self.event_bus.publish([*wallet.events, *order.events])
-        wallet.clear_events()
-        order.clear_events()
 
         return order
