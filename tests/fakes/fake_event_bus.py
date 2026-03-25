@@ -1,4 +1,4 @@
-from app.infrastucture.event_bus import SimpleEventBus
+from app.infrastructure.event_bus import SimpleEventBus
 
 
 class FakeEventBus(SimpleEventBus):
