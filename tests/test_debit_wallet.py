@@ -69,3 +69,25 @@ def test_debit_wallet_invalid_amount():
 
       with pytest.raises(InvalidAmountError):
             debit_use_case.execute(buyer.id, tenant.id, buyer.id, Money(-5))
+
+
+def test_debit_wallet_duplicate_reference_is_idempotent():
+      wallet_repo = FakeWalletRepository()
+      tenant_repo = FakeTenantRepository()
+      user_repo = FakeUserRepository()
+      fake_bus = FakeEventBus()
+      credit_use_case = CreditWallet(wallet_repository=wallet_repo, tenant_repository=tenant_repo, user_repository=user_repo, event_bus=fake_bus)
+      debit_use_case = DebitWallet(wallet_repository=wallet_repo, tenant_repository=tenant_repo, user_repository=user_repo, event_bus=fake_bus)
+
+      create_tenant_use_case = CreateTenant(tenant_repo=tenant_repo, event_bus=fake_bus)
+
+      tenant = create_tenant_use_case.execute(name="Shop A")
+      buyer = make_buyer()
+      user_repo.save(buyer)
+
+      credit_use_case.execute(buyer.id, tenant.id, buyer.id, Money(100))
+      first_wallet = debit_use_case.execute(buyer.id, tenant.id, buyer.id, Money(40), reference_id="debit-1")
+      second_wallet = debit_use_case.execute(buyer.id, tenant.id, buyer.id, Money(40), reference_id="debit-1")
+
+      assert first_wallet.balance == Money(60)
+      assert second_wallet.balance == Money(60)

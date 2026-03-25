@@ -1,7 +1,7 @@
-
-
 import uuid
 from datetime import datetime
+from dataclasses import dataclass
+
 from app.domain.entities.user import User
 from app.domain.events.tenant_user_registered import TenantUserRegistered
 from app.domain.exceptions import DomainError
@@ -9,9 +9,7 @@ from app.domain.value_objects.user_role import UserRole
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.user_repository import UserRepository
-
-
-from dataclasses import dataclass
+from app.use_cases.auth import ensure_tenant_manager
 
 
 @dataclass
@@ -20,11 +18,22 @@ class RegisterTenantUser:
     tenant_repo: TenantRepository
     event_bus: EventBus
 
-    def execute(self, email: str, name: str, tenant_id: str, role: UserRole, password: str) -> User:
+    def execute(
+        self,
+        actor_user_id: str,
+        email: str,
+        name: str,
+        tenant_id: str,
+        role: UserRole,
+        password: str,
+    ) -> User:
 
         tenant = self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
+
+        tenant.ensure_active()
+        ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
 
         if role not in (
             UserRole.TENANT_ADMIN,

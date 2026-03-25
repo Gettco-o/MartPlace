@@ -1,8 +1,11 @@
+import pytest
+
 from app.domain.entities.product import Product
 from app.domain.events.order_cancelled import OrderCancelled
 from app.domain.events.order_delivered import OrderDelivered
 from app.domain.events.order_fulfilled import OrderFulfilled
 from app.domain.events.order_processing_started import OrderProcessingStarted
+from app.domain.exceptions import DomainError
 from app.domain.value_objects.money import Money
 from app.domain.value_objects.order_item import OrderItem
 from app.domain.value_objects.order_status import OrderStatus
@@ -141,3 +144,71 @@ def test_buyer_can_cancel_paid_order_and_get_wallet_refund_and_stock_back():
     assert wallet_repo.get_wallet(tenant.id, buyer.id).balance == Money(15000)
     assert product_repo.get_by_id(tenant.id, product.id).stock == 10
     assert any(isinstance(e, OrderCancelled) for e in fake_bus.published_events)
+
+
+def test_order_rejects_invalid_lifecycle_transitions():
+    wallet_repo = FakeWalletRepository()
+    product_repo = FakeProductRepository()
+    order_repo = FakeOrderRepository()
+    idem_repo = FakeIdempotencyRepository()
+    tenant_repo = FakeTenantRepository()
+    user_repo = FakeUserRepository()
+    fake_bus = FakeEventBus()
+
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    credit_wallet = CreditWallet(wallet_repo, tenant_repo, user_repo, fake_bus)
+    create_order = CreateOrder(
+        order_repo,
+        product_repo,
+        wallet_repo,
+        idem_repo,
+        tenant_repo,
+        user_repo,
+        fake_bus,
+    )
+    start_processing = StartOrderProcessing(order_repo, tenant_repo, user_repo, fake_bus)
+    fulfill_order = FulfillOrder(order_repo, tenant_repo, user_repo, fake_bus)
+    deliver_order = DeliverOrder(order_repo, tenant_repo, user_repo, fake_bus)
+    cancel_order = CancelOrder(
+        order_repo,
+        product_repo,
+        wallet_repo,
+        tenant_repo,
+        user_repo,
+        fake_bus,
+    )
+
+    tenant = create_tenant.execute(name="Shop A")
+    buyer = make_buyer()
+    tenant_user = make_tenant_user(tenant.id)
+    user_repo.save(buyer)
+    user_repo.save(tenant_user)
+    product_repo.save(
+        Product(
+            id="prod_1",
+            tenant_id=tenant.id,
+            name="Rice",
+            price=Money(5000),
+            stock=10,
+        )
+    )
+
+    credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(20000), reference_id="topup-1")
+    order = create_order.execute(
+        actor_user_id=buyer.id,
+        tenant_id=tenant.id,
+        user_id=buyer.id,
+        items=[OrderItem(product_id="prod_1", quantity=1, unit_price=Money(1))],
+        idempotency_key="order-invalid-1",
+    )
+
+    with pytest.raises(DomainError, match="Only processing orders can be marked as FULFILLED"):
+        fulfill_order.execute(tenant_user.id, tenant.id, order.id)
+
+    with pytest.raises(DomainError, match="Only fulfilled orders can be marked as DELIVERED"):
+        deliver_order.execute(tenant_user.id, tenant.id, order.id)
+
+    start_processing.execute(tenant_user.id, tenant.id, order.id)
+
+    with pytest.raises(DomainError, match="Only paid orders can be cancelled"):
+        cancel_order.execute(buyer.id, tenant.id, order.id)
