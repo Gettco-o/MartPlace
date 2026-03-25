@@ -1,9 +1,12 @@
 
 
 import uuid
+from datetime import datetime
 from app.domain.entities.user import User
+from app.domain.events.tenant_user_registered import TenantUserRegistered
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.user_role import UserRole
+from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.user_repository import UserRepository
 
@@ -15,6 +18,7 @@ from dataclasses import dataclass
 class RegisterTenantUser:
     user_repo: UserRepository
     tenant_repo: TenantRepository
+    event_bus: EventBus
 
     def execute(self, email: str, name: str, tenant_id: str, role: UserRole, password: str) -> User:
 
@@ -41,4 +45,15 @@ class RegisterTenantUser:
         )
 
         self.user_repo.save(user)
+        user.record_event(
+            TenantUserRegistered(
+                user_id=user.id,
+                tenant_id=user.tenant_id,
+                email=user.email,
+                role=user.role.value,
+                occurred_at=datetime.now(),
+            )
+        )
+        self.event_bus.publish(user.events)
+        user.clear_events()
         return user

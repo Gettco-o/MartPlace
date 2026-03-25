@@ -1,5 +1,6 @@
 from app.domain.exceptions import DomainError
 from dataclasses import dataclass
+from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
 from app.domain.value_objects.money import Money
@@ -8,6 +9,7 @@ from app.domain.value_objects.money import Money
 class DebitWallet:
       wallet_repository: WalletRepository
       tenant_repository: TenantRepository
+      event_bus: EventBus
 
       def execute(self, tenant_id: str, user_id: str, amount: Money):
             tenant = self.tenant_repository.get_by_id(tenant_id)
@@ -23,5 +25,7 @@ class DebitWallet:
             
             wallet.debit(amount)
             self.wallet_repository.save(wallet)
+            self.event_bus.publish(wallet.events)
+            wallet.clear_events()
 
             return wallet

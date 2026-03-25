@@ -1,10 +1,12 @@
 import pytest
 
+from app.domain.events.product_created import ProductCreated
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.money import Money
 from app.use_cases.product.create_product import CreateProduct
 from app.use_cases.tenant.create_tenant import CreateTenant
 from app.use_cases.tenant.suspend_tenant import SuspendTenant
+from tests.fakes.fake_event_bus import FakeEventBus
 from tests.fakes.fake_product_repository import FakeProductRepository
 from tests.fakes.fake_tenant_repository import FakeTenantRepository
 
@@ -12,9 +14,10 @@ from tests.fakes.fake_tenant_repository import FakeTenantRepository
 def test_create_product_success():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    use_case = CreateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    use_case = CreateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute(name="Shop A")
 
@@ -31,14 +34,16 @@ def test_create_product_success():
     assert product.price == Money(1500)
     assert product.stock == 12
     assert product_repo.get_by_id(tenant.id, product.id) == product
+    assert any(isinstance(event, ProductCreated) for event in fake_bus.published_events)
 
 
 def test_create_product_duplicate_name_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    use_case = CreateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    use_case = CreateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute(name="Shop A")
 
@@ -61,7 +66,7 @@ def test_create_product_duplicate_name_raises():
 def test_create_product_missing_tenant_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
-    use_case = CreateProduct(product_repo, tenant_repo)
+    use_case = CreateProduct(product_repo, tenant_repo, FakeEventBus())
 
     with pytest.raises(DomainError, match="Tenant not found"):
         use_case.execute(
@@ -75,10 +80,11 @@ def test_create_product_missing_tenant_raises():
 def test_create_product_inactive_tenant_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    suspend_tenant = SuspendTenant(tenant_repo)
-    use_case = CreateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    suspend_tenant = SuspendTenant(tenant_repo, fake_bus)
+    use_case = CreateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute(name="Shop A")
     suspend_tenant.execute(tenant.id)
@@ -95,9 +101,10 @@ def test_create_product_inactive_tenant_raises():
 def test_create_product_invalid_values_raise():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    use_case = CreateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    use_case = CreateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute(name="Shop A")
 

@@ -1,9 +1,12 @@
 from dataclasses import dataclass
+from datetime import datetime
 import uuid
 
 from app.domain.entities.product import Product
+from app.domain.events.product_created import ProductCreated
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.money import Money
+from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
 
@@ -12,6 +15,7 @@ from app.interfaces.repositories.tenant_repository import TenantRepository
 class CreateProduct:
     product_repo: ProductRepository
     tenant_repo: TenantRepository
+    event_bus: EventBus
 
     def execute(self, tenant_id: str, name: str, price: Money, stock: int) -> Product:
         tenant = self.tenant_repo.get_by_id(tenant_id)
@@ -42,4 +46,16 @@ class CreateProduct:
         )
 
         self.product_repo.save(product)
+        product.record_event(
+            ProductCreated(
+                product_id=product.id,
+                tenant_id=product.tenant_id,
+                name=product.name,
+                price_amount=product.price.amount,
+                stock=product.stock,
+                occurred_at=datetime.now(),
+            )
+        )
+        self.event_bus.publish(product.events)
+        product.clear_events()
         return product

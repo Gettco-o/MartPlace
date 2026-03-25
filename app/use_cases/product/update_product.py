@@ -1,8 +1,11 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 from app.domain.entities.product import Product
+from app.domain.events.product_updated import ProductUpdated
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.money import Money
+from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
 
@@ -11,6 +14,7 @@ from app.interfaces.repositories.tenant_repository import TenantRepository
 class UpdateProduct:
     product_repo: ProductRepository
     tenant_repo: TenantRepository
+    event_bus: EventBus
 
     def execute(
         self,
@@ -50,4 +54,16 @@ class UpdateProduct:
         product.stock = stock
 
         self.product_repo.save(product)
+        product.record_event(
+            ProductUpdated(
+                product_id=product.id,
+                tenant_id=product.tenant_id,
+                name=product.name,
+                price_amount=product.price.amount,
+                stock=product.stock,
+                occurred_at=datetime.now(),
+            )
+        )
+        self.event_bus.publish(product.events)
+        product.clear_events()
         return product

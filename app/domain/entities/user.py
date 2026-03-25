@@ -1,12 +1,13 @@
 from dataclasses import dataclass
 from typing import Optional
 
+from app.domain.entities.entity_with_events import EntityWithEvents
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.user_role import UserRole
 from app.domain.value_objects.user_status import UserStatus
 
 @dataclass
-class User:
+class User(EntityWithEvents):
       id: str
       email: str
       name: str

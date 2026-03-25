@@ -1,8 +1,10 @@
 from app.domain.entities.product import Product
 from app.domain.value_objects.money import Money
+from app.domain.value_objects.order_item import OrderItem
 from app.domain.value_objects.order_status import OrderStatus
 from app.use_cases.order.create_order import CreateOrder
 from app.use_cases.order.refund_order import RefundOrder
+from app.use_cases.tenant.create_tenant import CreateTenant
 from app.use_cases.wallet.credit_wallet import CreditWallet
 from tests.fakes.fake_event_bus import FakeEventBus
 from app.domain.events.order_refunded import OrderRefunded
@@ -22,13 +24,14 @@ def test_refund_order_idempotent():
     tenant_repo = FakeTenantRepository()
 
     # use cases
-    credit_wallet = CreditWallet(wallet_repo, tenant_repo)
     fake_bus = FakeEventBus()
+    credit_wallet = CreditWallet(wallet_repo, tenant_repo, fake_bus)
     create_order = CreateOrder(
         order_repo,
         product_repo,
         wallet_repo,
         idem_repo,
+        tenant_repo,
         fake_bus,
     )
     refund_order = RefundOrder(
@@ -36,13 +39,18 @@ def test_refund_order_idempotent():
         product_repo,
         wallet_repo,
         idem_repo,
+        tenant_repo,
         fake_bus,
     )
+
+    create_tenant_use_case = CreateTenant(tenant_repo=tenant_repo, event_bus=fake_bus)
+
+    tenant = create_tenant_use_case.execute(name="Shop A")
 
     # setup product
     product = Product(
         id="prod_1",
-        tenant_id="tenant_1",
+        tenant_id=tenant.id,
         name="Nunex",
         price=Money(50),
         stock=10,
@@ -50,26 +58,31 @@ def test_refund_order_idempotent():
     product_repo.save(product)
 
     # setup wallet
-    credit_wallet.execute("tenant_1", "user_1", Money(100))
+    credit_wallet.execute(tenant.id, "user_1", Money(100))
 
     # create order
     order = create_order.execute(
-        tenant_id="tenant_1",
-        user_id="user_1",
-        products={"prod_1": 1},
-        idempotency_key="order-123",
-    )
+            tenant_id=tenant.id,
+            user_id="user_1",
+            items=[
+                  OrderItem(
+                        product_id="prod_1",
+                        quantity=2,
+                        unit_price=Money(50)
+                  )
+            ],
+            idempotency_key="order-123")
 
     # refund (first call)
     refunded_1 = refund_order.execute(
-        tenant_id="tenant_1",
+        tenant_id=tenant.id,
         order_id=order.id,
         idempotency_key="refund-123",
     )
 
     # refund (retry)
     refunded_2 = refund_order.execute(
-        tenant_id="tenant_1",
+        tenant_id=tenant.id,
         order_id=order.id,
         idempotency_key="refund-123",
     )
@@ -80,8 +93,8 @@ def test_refund_order_idempotent():
     # ensure an OrderRefunded event was published
     assert any(isinstance(e, OrderRefunded) for e in fake_bus.published_events)
 
-    wallet = wallet_repo.get_wallet("tenant_1", "user_1")
+    wallet = wallet_repo.get_wallet(tenant.id, "user_1")
     assert wallet.balance.amount == 100  # refunded
 
-    product = product_repo.get_by_id("tenant_1", "prod_1")
+    product = product_repo.get_by_id(tenant.id, "prod_1")
     assert product.stock == 10  # stock restored

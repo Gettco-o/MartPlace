@@ -1,11 +1,14 @@
 from dataclasses import dataclass
 from collections import defaultdict
-from app.domain.entities.order import Order, OrderItem
+from app.domain.entities.idempotency import IdempotencyRecord
+from app.domain.entities.order import Order
 from app.domain.exceptions import DomainError
-from app.domain.value_objects.order_status import OrderStatus
+from app.domain.value_objects.idempotent_operation import IdempotentOperation
 from app.domain.value_objects.money import Money
+from app.domain.value_objects.order_item import OrderItem
 import uuid
 
+from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.cart_repository import CartRepository
 from app.interfaces.repositories.idempotency_repository import IdempotencyRepository
 from app.interfaces.repositories.order_repository import OrderRepository
@@ -19,13 +22,17 @@ class CheckoutCart:
     order_repo: OrderRepository
     wallet_repo: WalletRepository
     idempotency_repo: IdempotencyRepository
+    event_bus: EventBus
 
     def execute(self, user_id: str, idempotency_key: str) -> list[Order]:
 
-        # 1️⃣ Idempotency check
-        existing = self.idempotency_repo.get(idempotency_key)
+        operation = IdempotentOperation.CHECKOUT_CART
+        existing = self.idempotency_repo.get(idempotency_key, operation)
         if existing:
-            return existing
+            return [
+                self.order_repo.get_by_id(tenant_id, order_id)
+                for tenant_id, order_id in existing.result_id
+            ]
 
         cart = self.cart_repo.get_by_user(user_id)
 
@@ -85,10 +92,12 @@ class CheckoutCart:
                 user_id=user_id,
                 items=order_items,
                 amount=total,
-                status=OrderStatus.PAID
             )
+            order.mark_paid()
 
             self.order_repo.save(order)
+            self.event_bus.publish(order.events)
+            order.clear_events()
             created_orders.append(order)
 
         # 4️⃣ Clear cart only after success
@@ -96,6 +105,12 @@ class CheckoutCart:
         self.cart_repo.save(cart)
 
         # 5️⃣ Store idempotent result
-        self.idempotency_repo.save(idempotency_key, created_orders)
+        self.idempotency_repo.save(
+            IdempotencyRecord(
+                key=idempotency_key,
+                operation=operation,
+                result_id=[(order.tenant_id, order.id) for order in created_orders],
+            )
+        )
 
         return created_orders

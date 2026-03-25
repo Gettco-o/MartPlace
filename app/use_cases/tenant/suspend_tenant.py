@@ -1,11 +1,13 @@
 from dataclasses import dataclass
 from app.domain.entities.tenant import Tenant
+from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.domain.exceptions import DomainError
 
 @dataclass
 class SuspendTenant:
     tenant_repo: TenantRepository
+    event_bus: EventBus
 
     def execute(self, tenant_id: str) -> Tenant:
         tenant = self.tenant_repo.get_by_id(tenant_id)
@@ -14,5 +16,7 @@ class SuspendTenant:
 
         tenant.suspend()
         self.tenant_repo.save(tenant)
+        self.event_bus.publish(tenant.events)
+        tenant.clear_events()
 
         return tenant

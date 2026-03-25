@@ -1,11 +1,13 @@
 import pytest
 
 from app.domain.entities.product import Product
+from app.domain.events.product_updated import ProductUpdated
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.money import Money
 from app.use_cases.product.update_product import UpdateProduct
 from app.use_cases.tenant.create_tenant import CreateTenant
 from app.use_cases.tenant.suspend_tenant import SuspendTenant
+from tests.fakes.fake_event_bus import FakeEventBus
 from tests.fakes.fake_product_repository import FakeProductRepository
 from tests.fakes.fake_tenant_repository import FakeTenantRepository
 
@@ -13,9 +15,10 @@ from tests.fakes.fake_tenant_repository import FakeTenantRepository
 def test_update_product_success():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    update_product = UpdateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    update_product = UpdateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute("Shop A")
     product = Product(
@@ -39,12 +42,13 @@ def test_update_product_success():
     assert updated.name == "New Name"
     assert updated.price == Money(1200)
     assert updated.stock == 8
+    assert any(isinstance(event, ProductUpdated) for event in fake_bus.published_events)
 
 
 def test_update_product_missing_tenant_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
-    update_product = UpdateProduct(product_repo, tenant_repo)
+    update_product = UpdateProduct(product_repo, tenant_repo, FakeEventBus())
 
     with pytest.raises(DomainError, match="Tenant not found"):
         update_product.execute(
@@ -59,10 +63,11 @@ def test_update_product_missing_tenant_raises():
 def test_update_product_inactive_tenant_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    suspend_tenant = SuspendTenant(tenant_repo)
-    update_product = UpdateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    suspend_tenant = SuspendTenant(tenant_repo, fake_bus)
+    update_product = UpdateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute("Shop A")
     product_repo.save(
@@ -90,9 +95,10 @@ def test_update_product_inactive_tenant_raises():
 def test_update_product_missing_product_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    update_product = UpdateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    update_product = UpdateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute("Shop A")
 
@@ -109,9 +115,10 @@ def test_update_product_missing_product_raises():
 def test_update_product_duplicate_name_raises():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    update_product = UpdateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    update_product = UpdateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute("Shop A")
     product_repo.save(
@@ -146,9 +153,10 @@ def test_update_product_duplicate_name_raises():
 def test_update_product_keeps_same_name_without_false_duplicate():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    update_product = UpdateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    update_product = UpdateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute("Shop A")
     product_repo.save(
@@ -177,9 +185,10 @@ def test_update_product_keeps_same_name_without_false_duplicate():
 def test_update_product_invalid_values_raise():
     tenant_repo = FakeTenantRepository()
     product_repo = FakeProductRepository()
+    fake_bus = FakeEventBus()
 
-    create_tenant = CreateTenant(tenant_repo)
-    update_product = UpdateProduct(product_repo, tenant_repo)
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    update_product = UpdateProduct(product_repo, tenant_repo, fake_bus)
 
     tenant = create_tenant.execute("Shop A")
     product_repo.save(
