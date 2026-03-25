@@ -1,5 +1,6 @@
 from app.domain.entities.product import Product
 from app.domain.exceptions import DomainError
+from app.domain.value_objects.cart_status import CartStatus
 from app.domain.value_objects.money import Money
 from app.use_cases.cart.add_to_cart import AddToCart
 from app.use_cases.tenant.create_tenant import CreateTenant
@@ -48,6 +49,7 @@ def test_add_to_cart_creates_cart_and_adds_item():
 
     assert cart.user_id == buyer.id
     assert len(cart.items) == 1
+    assert cart.status == CartStatus.ACTIVE
     assert cart.items[0].product_id == "prod_1"
     assert cart.items[0].quantity == 2
     assert cart.items[0].unit_price == Money(2500)

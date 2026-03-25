@@ -8,6 +8,7 @@ from app.interfaces.repositories.cart_repository import CartRepository
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.user_repository import UserRepository
+from app.domain.value_objects.cart_status import CartStatus
 from app.use_cases.auth import ensure_active_buyer
 
 
@@ -42,7 +43,7 @@ class AddToCart:
             raise DomainError("Product not found")
 
         cart = self.cart_repo.get_by_user(user_id)
-        if cart is None:
+        if cart is None or cart.status == CartStatus.COMPLETED:
             cart = Cart(
                 id=str(uuid.uuid4()),
                 user_id=user_id,

@@ -16,3 +16,6 @@ class FakeCartRepository(CartRepository):
     def delete(self, user_id: str) -> None:
         if user_id in self.carts:
             del self.carts[user_id]
+
+    def list_all(self) -> list[Cart]:
+        return list(self.carts.values())

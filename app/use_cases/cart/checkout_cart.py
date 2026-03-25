@@ -54,7 +54,8 @@ class CheckoutCart:
         if not cart or cart.is_empty():
             raise DomainError("Cart is empty")
 
-        # 2️⃣ Group cart items by tenant
+        cart.ensure_active()
+
         grouped = defaultdict(list)
 
         for item in cart.items:
@@ -82,7 +83,7 @@ class CheckoutCart:
             )
             created_orders.append(order)
 
-        cart.clear()
+        cart.complete()
         self.cart_repo.save(cart)
 
         self.idempotency_repo.save(

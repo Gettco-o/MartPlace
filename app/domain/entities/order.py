@@ -1,8 +1,12 @@
 from dataclasses import dataclass, field
 from datetime import datetime
 from app.domain.entities.entity_with_events import EntityWithEvents
+from app.domain.events.order_cancelled import OrderCancelled
 from app.domain.events.order_created import OrderCreated
+from app.domain.events.order_delivered import OrderDelivered
 from app.domain.events.order_failed import OrderFailed
+from app.domain.events.order_fulfilled import OrderFulfilled
+from app.domain.events.order_processing_started import OrderProcessingStarted
 from app.domain.events.order_refunded import OrderRefunded
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.money import Money
@@ -24,6 +28,14 @@ class Order(EntityWithEvents):
             return f"Order(id={self.id}, tenant_id={self.tenant_id}, user_id={self.user_id}, items={self.items}, amount={self.amount}, status={self.status})"
       
       def can_refund(self) -> bool:
+            return self.status in (
+                  OrderStatus.PAID,
+                  OrderStatus.PROCESSING,
+                  OrderStatus.FULFILLED,
+                  OrderStatus.DELIVERED,
+            )
+
+      def can_cancel(self) -> bool:
             return self.status == OrderStatus.PAID
 
       
@@ -33,6 +45,58 @@ class Order(EntityWithEvents):
             self.status = OrderStatus.PAID
             self.record_event(
                   OrderCreated(
+                        order_id=self.id,
+                        tenant_id=self.tenant_id,
+                        user_id=self.user_id,
+                        occurred_at=datetime.now(),
+                  )
+            )
+
+      def start_processing(self):
+            if self.status != OrderStatus.PAID:
+                  raise DomainError("Only paid orders can be moved to PROCESSING")
+            self.status = OrderStatus.PROCESSING
+            self.record_event(
+                  OrderProcessingStarted(
+                        order_id=self.id,
+                        tenant_id=self.tenant_id,
+                        user_id=self.user_id,
+                        occurred_at=datetime.now(),
+                  )
+            )
+
+      def mark_fulfilled(self):
+            if self.status != OrderStatus.PROCESSING:
+                  raise DomainError("Only processing orders can be marked as FULFILLED")
+            self.status = OrderStatus.FULFILLED
+            self.record_event(
+                  OrderFulfilled(
+                        order_id=self.id,
+                        tenant_id=self.tenant_id,
+                        user_id=self.user_id,
+                        occurred_at=datetime.now(),
+                  )
+            )
+
+      def mark_delivered(self):
+            if self.status != OrderStatus.FULFILLED:
+                  raise DomainError("Only fulfilled orders can be marked as DELIVERED")
+            self.status = OrderStatus.DELIVERED
+            self.record_event(
+                  OrderDelivered(
+                        order_id=self.id,
+                        tenant_id=self.tenant_id,
+                        user_id=self.user_id,
+                        occurred_at=datetime.now(),
+                  )
+            )
+
+      def mark_cancelled(self):
+            if not self.can_cancel():
+                  raise DomainError("Only paid orders can be cancelled")
+            self.status = OrderStatus.CANCELLED
+            self.record_event(
+                  OrderCancelled(
                         order_id=self.id,
                         tenant_id=self.tenant_id,
                         user_id=self.user_id,

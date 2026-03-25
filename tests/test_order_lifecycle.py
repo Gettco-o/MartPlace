@@ -1,0 +1,143 @@
+from app.domain.entities.product import Product
+from app.domain.events.order_cancelled import OrderCancelled
+from app.domain.events.order_delivered import OrderDelivered
+from app.domain.events.order_fulfilled import OrderFulfilled
+from app.domain.events.order_processing_started import OrderProcessingStarted
+from app.domain.value_objects.money import Money
+from app.domain.value_objects.order_item import OrderItem
+from app.domain.value_objects.order_status import OrderStatus
+from app.use_cases.order.cancel_order import CancelOrder
+from app.use_cases.order.create_order import CreateOrder
+from app.use_cases.order.deliver_order import DeliverOrder
+from app.use_cases.order.fulfill_order import FulfillOrder
+from app.use_cases.order.start_order_processing import StartOrderProcessing
+from app.use_cases.tenant.create_tenant import CreateTenant
+from app.use_cases.wallet.credit_wallet import CreditWallet
+from tests.fakes.fake_event_bus import FakeEventBus
+from tests.fakes.fake_idempotency_repository import FakeIdempotencyRepository
+from tests.fakes.fake_order_repository import FakeOrderRepository
+from tests.fakes.fake_product_repository import FakeProductRepository
+from tests.fakes.fake_tenant_repository import FakeTenantRepository
+from tests.fakes.fake_user_repository import FakeUserRepository
+from tests.fakes.fake_wallet_repository import FakeWalletRepository
+from tests.helpers import make_buyer, make_tenant_user
+
+
+def test_order_progresses_from_paid_to_processing_to_fulfilled_to_delivered():
+    wallet_repo = FakeWalletRepository()
+    product_repo = FakeProductRepository()
+    order_repo = FakeOrderRepository()
+    idem_repo = FakeIdempotencyRepository()
+    tenant_repo = FakeTenantRepository()
+    user_repo = FakeUserRepository()
+    fake_bus = FakeEventBus()
+
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    credit_wallet = CreditWallet(wallet_repo, tenant_repo, user_repo, fake_bus)
+    create_order = CreateOrder(
+        order_repo,
+        product_repo,
+        wallet_repo,
+        idem_repo,
+        tenant_repo,
+        user_repo,
+        fake_bus,
+    )
+    start_processing = StartOrderProcessing(order_repo, tenant_repo, user_repo, fake_bus)
+    fulfill_order = FulfillOrder(order_repo, tenant_repo, user_repo, fake_bus)
+    deliver_order = DeliverOrder(order_repo, tenant_repo, user_repo, fake_bus)
+
+    tenant = create_tenant.execute(name="Shop A")
+    buyer = make_buyer()
+    tenant_user = make_tenant_user(tenant.id)
+    user_repo.save(buyer)
+    user_repo.save(tenant_user)
+
+    product = Product(
+        id="prod_1",
+        tenant_id=tenant.id,
+        name="Rice",
+        price=Money(5000),
+        stock=10,
+    )
+    product_repo.save(product)
+
+    credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(15000), reference_id="topup-1")
+    order = create_order.execute(
+        actor_user_id=buyer.id,
+        tenant_id=tenant.id,
+        user_id=buyer.id,
+        items=[OrderItem(product_id=product.id, quantity=2, unit_price=Money(1))],
+        idempotency_key="order-1",
+    )
+
+    processing = start_processing.execute(tenant_user.id, tenant.id, order.id)
+    assert processing.status == OrderStatus.PROCESSING
+
+    fulfilled = fulfill_order.execute(tenant_user.id, tenant.id, order.id)
+    assert fulfilled.status == OrderStatus.FULFILLED
+
+    delivered = deliver_order.execute(tenant_user.id, tenant.id, order.id)
+    assert delivered.status == OrderStatus.DELIVERED
+    assert any(isinstance(e, OrderProcessingStarted) for e in fake_bus.published_events)
+    assert any(isinstance(e, OrderFulfilled) for e in fake_bus.published_events)
+    assert any(isinstance(e, OrderDelivered) for e in fake_bus.published_events)
+
+
+def test_buyer_can_cancel_paid_order_and_get_wallet_refund_and_stock_back():
+    wallet_repo = FakeWalletRepository()
+    product_repo = FakeProductRepository()
+    order_repo = FakeOrderRepository()
+    idem_repo = FakeIdempotencyRepository()
+    tenant_repo = FakeTenantRepository()
+    user_repo = FakeUserRepository()
+    fake_bus = FakeEventBus()
+
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    credit_wallet = CreditWallet(wallet_repo, tenant_repo, user_repo, fake_bus)
+    create_order = CreateOrder(
+        order_repo,
+        product_repo,
+        wallet_repo,
+        idem_repo,
+        tenant_repo,
+        user_repo,
+        fake_bus,
+    )
+    cancel_order = CancelOrder(
+        order_repo,
+        product_repo,
+        wallet_repo,
+        tenant_repo,
+        user_repo,
+        fake_bus,
+    )
+
+    tenant = create_tenant.execute(name="Shop A")
+    buyer = make_buyer()
+    user_repo.save(buyer)
+
+    product = Product(
+        id="prod_1",
+        tenant_id=tenant.id,
+        name="Rice",
+        price=Money(5000),
+        stock=10,
+    )
+    product_repo.save(product)
+
+    credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(15000), reference_id="topup-1")
+    order = create_order.execute(
+        actor_user_id=buyer.id,
+        tenant_id=tenant.id,
+        user_id=buyer.id,
+        items=[OrderItem(product_id=product.id, quantity=1, unit_price=Money(1))],
+        idempotency_key="order-2",
+    )
+
+    cancelled = cancel_order.execute(buyer.id, tenant.id, order.id)
+
+    assert cancelled.status == OrderStatus.CANCELLED
+    assert wallet_repo.get_wallet(tenant.id, buyer.id).balance == Money(15000)
+    assert product_repo.get_by_id(tenant.id, product.id).stock == 10
+    assert any(isinstance(e, OrderCancelled) for e in fake_bus.published_events)

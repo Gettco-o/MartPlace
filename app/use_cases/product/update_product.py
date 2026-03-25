@@ -6,6 +6,7 @@ from app.domain.events.product_updated import ProductUpdated
 from app.domain.exceptions import DomainError
 from app.domain.value_objects.money import Money
 from app.interfaces.event_bus import EventBus
+from app.interfaces.repositories.cart_repository import CartRepository
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.user_repository import UserRepository
@@ -14,6 +15,7 @@ from app.use_cases.auth import ensure_tenant_manager
 
 @dataclass
 class UpdateProduct:
+    cart_repo: CartRepository
     product_repo: ProductRepository
     tenant_repo: TenantRepository
     user_repo: UserRepository
@@ -59,6 +61,14 @@ class UpdateProduct:
         product.stock = stock
 
         self.product_repo.save(product)
+        for cart in self.cart_repo.list_all():
+            cart.refresh_item_price(
+                product_id=product.id,
+                tenant_id=tenant_id,
+                unit_price=product.price,
+            )
+            self.cart_repo.save(cart)
+
         product.record_event(
             ProductUpdated(
                 product_id=product.id,

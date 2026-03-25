@@ -16,3 +16,8 @@ class CartRepository(ABC):
       def delete(self, cart_id: str) -> None:
             """Delete a cart by its ID."""
             pass
+
+      @abstractmethod
+      def list_all(self) -> list[Cart]:
+            """Return all carts."""
+            pass
