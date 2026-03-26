@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from quart import Blueprint
-from quart_schema import validate_request, validate_response
+from quart_schema import tag_blueprint, validate_request, validate_response
 
 from app.infrastructure.web.auth import auth_required, get_current_actor_id
 from app.infrastructure.web.dependencies import request_services
@@ -14,6 +14,7 @@ from app.infrastructure.web.schemas import (
 from app.infrastructure.web.utils import success
 
 users = Blueprint('users', __name__, url_prefix='/users')
+tag_blueprint(users, ["users"])
 
 
 @users.post("/buyers")

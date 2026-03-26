@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from quart import Blueprint
-from quart_schema import validate_request, validate_response
+from quart_schema import tag_blueprint, validate_request, validate_response
 
 from app.infrastructure.web.dependencies import request_services
 from app.infrastructure.web.schemas import (
@@ -12,6 +12,7 @@ from app.infrastructure.web.schemas import (
 from app.infrastructure.web.utils import success
 
 tenants = Blueprint('tenants', __name__, url_prefix='/tenants')
+tag_blueprint(tenants, ["tenants"])
 
 
 @tenants.post("/")

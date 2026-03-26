@@ -1,7 +1,7 @@
 from dataclasses import asdict
 
 from quart import Blueprint
-from quart_schema import validate_request, validate_response
+from quart_schema import tag_blueprint, validate_request, validate_response
 
 from app.infrastructure.web.auth import issue_auth_tokens, refresh_auth_tokens, revoke_refresh_token
 from app.infrastructure.web.dependencies import request_services
@@ -16,6 +16,7 @@ from app.infrastructure.web.schemas import (
 from app.infrastructure.web.utils import success
 
 auth = Blueprint("auth", __name__, url_prefix="/auth")
+tag_blueprint(auth, ["auth"])
 
 
 @auth.post("/login")

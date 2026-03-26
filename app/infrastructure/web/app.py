@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from quart import Quart, jsonify
+from quart_schema import tag
 
 from app.domain.exceptions import DomainError
 from app.infrastructure.web.auth import AuthenticationError
@@ -33,6 +34,7 @@ def create_app():
             return jsonify({"success": False, "error": str(error)}), 401
 
       @app.get("/health")
+      @tag(["system"])
       async def health():
             return jsonify(
                   {
