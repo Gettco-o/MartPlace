@@ -4,9 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entities.tenant import Tenant
 from app.infrastructure.db.mappers import tenant_to_entity, tenant_to_model
 from app.infrastructure.db.models import TenantModel
+from app.interfaces.repositories.tenant_repository import TenantRepository
 
 
-class SqlAlchemyTenantRepository:
+class SqlAlchemyTenantRepository(TenantRepository):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 

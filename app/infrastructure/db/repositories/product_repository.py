@@ -4,9 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entities.product import Product
 from app.infrastructure.db.mappers import product_to_entity, product_to_model
 from app.infrastructure.db.models import ProductModel
+from app.interfaces.repositories.product_repository import ProductRepository
 
 
-class SqlAlchemyProductRepository:
+class SqlAlchemyProductRepository(ProductRepository):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 

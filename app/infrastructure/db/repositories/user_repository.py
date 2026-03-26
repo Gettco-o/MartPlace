@@ -4,9 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.domain.entities.user import User
 from app.infrastructure.db.mappers import user_to_entity, user_to_model
 from app.infrastructure.db.models import UserModel
+from app.interfaces.repositories.user_repository import UserRepository
 
 
-class SqlAlchemyUserRepository:
+class SqlAlchemyUserRepository(UserRepository):
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
