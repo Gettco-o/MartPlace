@@ -12,14 +12,14 @@ class SuspendTenant:
     user_repo: UserRepository
     event_bus: EventBus
 
-    def execute(self, actor_user_id: str, tenant_id: str) -> Tenant:
-        ensure_platform_admin(self.user_repo, actor_user_id)
-        tenant = self.tenant_repo.get_by_id(tenant_id)
+    async def execute(self, actor_user_id: str, tenant_id: str) -> Tenant:
+        await ensure_platform_admin(self.user_repo, actor_user_id)
+        tenant = await self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
         tenant.suspend()
-        self.tenant_repo.save(tenant)
+        await self.tenant_repo.save(tenant)
         self.event_bus.publish(tenant.events)
         tenant.clear_events()
 

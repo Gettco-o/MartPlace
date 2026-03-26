@@ -23,25 +23,25 @@ class PlaceOrder:
     user_repo: UserRepository
     event_bus: EventBus
 
-    def execute(
+    async def execute(
         self,
         actor_user_id: str,
         tenant_id: str,
         user_id: str,
         items: list[OrderItem],
     ) -> Order:
-        tenant = self.tenant_repo.get_by_id(tenant_id)
+        tenant = await self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
-        ensure_active_buyer(self.user_repo, actor_user_id, user_id)
+        await ensure_active_buyer(self.user_repo, actor_user_id, user_id)
 
         total_amount = Money(0)
         product_entities = []
         normalized_items = []
         for item in items:
-            product = self.product_repo.get_by_id(tenant_id, item.product_id)
+            product = await self.product_repo.get_by_id(tenant_id, item.product_id)
 
             if not product:
                 raise DomainError(f"Product {item.product_id} does not exist.")
@@ -56,7 +56,7 @@ class PlaceOrder:
             normalized_items.append(normalized_item)
             total_amount = total_amount.add(normalized_item.total())
 
-        wallet = self.wallet_repo.get_wallet(tenant_id, user_id)
+        wallet = await self.wallet_repo.get_wallet(tenant_id, user_id)
         if wallet is None:
             raise DomainError("Wallet does not exist")
 
@@ -71,10 +71,10 @@ class PlaceOrder:
         order.mark_paid()
 
         for product in product_entities:
-            self.product_repo.save(product)
+            await self.product_repo.save(product)
 
-        self.wallet_repo.append_entry(wallet_entry)
-        self.order_repo.save(order)
+        await self.wallet_repo.append_entry(wallet_entry)
+        await self.order_repo.save(order)
 
         self.event_bus.publish([*wallet.events, *order.events])
         wallet.clear_events()

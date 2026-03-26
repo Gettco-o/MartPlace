@@ -22,8 +22,8 @@ class RefundOrder:
     user_repo: UserRepository
     event_bus: EventBus
 
-    def execute(self, actor_user_id: str, tenant_id: str, order_id: str, idempotency_key: str):
-        tenant = self.tenant_repo.get_by_id(tenant_id)
+    async def execute(self, actor_user_id: str, tenant_id: str, order_id: str, idempotency_key: str):
+        tenant = await self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
@@ -31,22 +31,22 @@ class RefundOrder:
 
         operation = IdempotentOperation.REFUND_ORDER
 
-        existing = self.idempotency_repo.get(idempotency_key, operation)
+        existing = await self.idempotency_repo.get(idempotency_key, operation)
         if existing:
-            return self.order_repo.get_by_id(tenant_id, order_id)
+            return await self.order_repo.get_by_id(tenant_id, order_id)
 
-        order = self.order_repo.get_by_id(tenant_id, order_id)
+        order = await self.order_repo.get_by_id(tenant_id, order_id)
         if not order:
             raise DomainError("Order not found")
 
-        ensure_active_buyer(self.user_repo, actor_user_id, order.user_id)
+        await ensure_active_buyer(self.user_repo, actor_user_id, order.user_id)
 
         for item in order.items:
-            product = self.product_repo.get_by_id(tenant_id, item.product_id)
+            product = await self.product_repo.get_by_id(tenant_id, item.product_id)
             product.increase_stock(item.quantity)
-            self.product_repo.save(product)
+            await self.product_repo.save(product)
 
-        wallet = self.wallet_repo.get_wallet(tenant_id, order.user_id)
+        wallet = await self.wallet_repo.get_wallet(tenant_id, order.user_id)
         if wallet is None:
             raise DomainError("Wallet does not exist")
 
@@ -54,10 +54,10 @@ class RefundOrder:
 
         order.mark_refunded()
 
-        self.wallet_repo.append_entry(wallet_entry)
-        self.order_repo.save(order)
+        await self.wallet_repo.append_entry(wallet_entry)
+        await self.order_repo.save(order)
 
-        self.idempotency_repo.save(
+        await self.idempotency_repo.save(
             IdempotencyRecord(
                 key=idempotency_key,
                 operation=operation,

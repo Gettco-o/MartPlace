@@ -8,26 +8,27 @@ from app.domain.exceptions import DomainError
 from app.domain.value_objects.user_role import UserRole
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.user_repository import UserRepository
+from werkzeug.security import generate_password_hash
 
 @dataclass
 class RegisterBuyer:
       user_repo: UserRepository
       event_bus: EventBus
 
-      def execute(self, email: str, name: str, password: str) -> User:
+      async def execute(self, email: str, name: str, password: str) -> User:
 
-            if self.user_repo.get_by_email(email):
+            if await self.user_repo.get_by_email(email):
                   raise DomainError("Email already in use")
             
             user = User(
                   id=str(uuid.uuid4()),
                   email=email.strip().lower(),
                   name=name,
-                  password=password,
+                  password=generate_password_hash(password),
                   role=UserRole.BUYER
             )
 
-            self.user_repo.save(user)
+            await self.user_repo.save(user)
             user.record_event(
                   BuyerRegistered(
                         user_id=user.id,

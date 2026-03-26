@@ -7,8 +7,8 @@ class FakeIdempotencyRepository(IdempotencyRepository):
     def __init__(self):
         self.records: dict[tuple[str, str], IdempotencyRecord] = {}
 
-    def get(self, key: str, operation: str) -> IdempotencyRecord:
+    async def get(self, key: str, operation: str) -> IdempotencyRecord:
         return self.records.get((key, operation))
 
-    def save(self, record):
+    async def save(self, record):
         self.records[(record.key, record.operation)] = record

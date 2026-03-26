@@ -15,20 +15,20 @@ class FulfillOrder:
     user_repo: UserRepository
     event_bus: EventBus
 
-    def execute(self, actor_user_id: str, tenant_id: str, order_id: str):
-        tenant = self.tenant_repo.get_by_id(tenant_id)
+    async def execute(self, actor_user_id: str, tenant_id: str, order_id: str):
+        tenant = await self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
-        ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
+        await ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
 
-        order = self.order_repo.get_by_id(tenant_id, order_id)
+        order = await self.order_repo.get_by_id(tenant_id, order_id)
         if not order:
             raise DomainError("Order not found")
 
         order.mark_fulfilled()
-        self.order_repo.save(order)
+        await self.order_repo.save(order)
         self.event_bus.publish(order.events)
         order.clear_events()
         return order

@@ -3,13 +3,13 @@ from app.domain.entities.product import Product
 
 class ProductRepository(ABC):
       @abstractmethod
-      def get_by_id(self, tenant_id: str, product_id: str) -> Product | None:
+      async def get_by_id(self, tenant_id: str, product_id: str) -> Product | None:
             pass
 
       @abstractmethod
-      def save(self, product):
+      async def save(self, product):
             pass
 
       @abstractmethod
-      def exists_by_name(self, tenant_id: str, name: str) -> bool: 
+      async def exists_by_name(self, tenant_id: str, name: str) -> bool: 
             pass

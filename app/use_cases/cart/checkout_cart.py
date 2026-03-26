@@ -39,17 +39,17 @@ class CheckoutCart:
             event_bus=self.event_bus,
         )
 
-    def execute(self, actor_user_id: str, user_id: str, idempotency_key: str) -> list[Order]:
+    async def execute(self, actor_user_id: str, user_id: str, idempotency_key: str) -> list[Order]:
 
         operation = IdempotentOperation.CHECKOUT_CART
-        existing = self.idempotency_repo.get(idempotency_key, operation)
+        existing = await self.idempotency_repo.get(idempotency_key, operation)
         if existing:
             return [
-                self.order_repo.get_by_id(tenant_id, order_id)
+                await self.order_repo.get_by_id(tenant_id, order_id)
                 for tenant_id, order_id in existing.result_id
             ]
 
-        cart = self.cart_repo.get_by_user(user_id)
+        cart = await self.cart_repo.get_by_user(user_id)
 
         if not cart or cart.is_empty():
             raise DomainError("Cart is empty")
@@ -75,7 +75,7 @@ class CheckoutCart:
                     )
                 )
 
-            order = self.place_order.execute(
+            order = await self.place_order.execute(
                 actor_user_id=actor_user_id,
                 tenant_id=tenant_id,
                 user_id=user_id,
@@ -84,9 +84,9 @@ class CheckoutCart:
             created_orders.append(order)
 
         cart.complete()
-        self.cart_repo.save(cart)
+        await self.cart_repo.save(cart)
 
-        self.idempotency_repo.save(
+        await self.idempotency_repo.save(
             IdempotencyRecord(
                 key=idempotency_key,
                 operation=operation,

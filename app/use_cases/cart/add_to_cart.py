@@ -19,7 +19,7 @@ class AddToCart:
     tenant_repo: TenantRepository
     user_repo: UserRepository
 
-    def execute(
+    async def execute(
         self,
         actor_user_id: str,
         user_id: str,
@@ -30,19 +30,19 @@ class AddToCart:
         if quantity <= 0:
             raise DomainError("Quantity must be greater than zero")
 
-        ensure_active_buyer(self.user_repo, actor_user_id, user_id)
+        await ensure_active_buyer(self.user_repo, actor_user_id, user_id)
 
-        tenant = self.tenant_repo.get_by_id(tenant_id)
+        tenant = await self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
 
-        product = self.product_repo.get_by_id(tenant_id, product_id)
+        product = await self.product_repo.get_by_id(tenant_id, product_id)
         if not product:
             raise DomainError("Product not found")
 
-        cart = self.cart_repo.get_by_user(user_id)
+        cart = await self.cart_repo.get_by_user(user_id)
         if cart is None or cart.status == CartStatus.COMPLETED:
             cart = Cart(
                 id=str(uuid.uuid4()),
@@ -57,6 +57,6 @@ class AddToCart:
                 unit_price=product.price,
             )
         )
-        self.cart_repo.save(cart)
+        await self.cart_repo.save(cart)
 
         return cart

@@ -11,15 +11,15 @@ class RemoveFromCart:
     cart_repo: CartRepository
     user_repo: UserRepository
 
-    def execute(
+    async def execute(
         self,
         actor_user_id: str,
         user_id: str,
         tenant_id: str,
         product_id: str,
     ):
-        ensure_active_buyer(self.user_repo, actor_user_id, user_id)
-        cart = self.cart_repo.get_by_user(user_id)
+        await ensure_active_buyer(self.user_repo, actor_user_id, user_id)
+        cart = await self.cart_repo.get_by_user(user_id)
         if cart is None:
             raise DomainError("Cart not found")
 
@@ -28,5 +28,5 @@ class RemoveFromCart:
         if len(cart.items) == existing_count:
             raise DomainError("Item not found in cart")
 
-        self.cart_repo.save(cart)
+        await self.cart_repo.save(cart)
         return cart

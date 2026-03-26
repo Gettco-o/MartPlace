@@ -21,7 +21,7 @@ class UpdateProduct:
     user_repo: UserRepository
     event_bus: EventBus
 
-    def execute(
+    async def execute(
         self,
         actor_user_id: str,
         tenant_id: str,
@@ -30,14 +30,14 @@ class UpdateProduct:
         price: Money,
         stock: int,
     ) -> Product:
-        tenant = self.tenant_repo.get_by_id(tenant_id)
+        tenant = await self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
-        ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
+        await ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
 
-        product = self.product_repo.get_by_id(tenant_id, product_id)
+        product = await self.product_repo.get_by_id(tenant_id, product_id)
         if not product:
             raise DomainError("Product not found")
 
@@ -51,7 +51,7 @@ class UpdateProduct:
             raise DomainError("Stock cannot be negative")
 
         product_name = name.strip()
-        if product_name != product.name and self.product_repo.exists_by_name(
+        if product_name != product.name and await self.product_repo.exists_by_name(
             tenant_id, product_name
         ):
             raise DomainError("Product name already in use")
@@ -60,14 +60,14 @@ class UpdateProduct:
         product.price = price
         product.stock = stock
 
-        self.product_repo.save(product)
-        for cart in self.cart_repo.list_all():
+        await self.product_repo.save(product)
+        for cart in await self.cart_repo.list_all():
             cart.refresh_item_price(
                 product_id=product.id,
                 tenant_id=tenant_id,
                 unit_price=product.price,
             )
-            self.cart_repo.save(cart)
+            await self.cart_repo.save(cart)
 
         product.record_event(
             ProductUpdated(

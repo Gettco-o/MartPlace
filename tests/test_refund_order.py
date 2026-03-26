@@ -1,3 +1,5 @@
+import asyncio
+
 from app.domain.entities.product import Product
 from app.domain.value_objects.money import Money
 from app.domain.value_objects.order_item import OrderItem
@@ -15,6 +17,8 @@ from tests.fakes.fake_tenant_repository import FakeTenantRepository
 from tests.fakes.fake_user_repository import FakeUserRepository
 from tests.fakes.fake_wallet_repository import FakeWalletRepository
 from tests.helpers import make_buyer
+
+run = asyncio.run
 
 
 def test_refund_order_idempotent():
@@ -50,9 +54,9 @@ def test_refund_order_idempotent():
 
     create_tenant_use_case = CreateTenant(tenant_repo=tenant_repo, event_bus=fake_bus)
 
-    tenant = create_tenant_use_case.execute(name="Shop A")
+    tenant = run(create_tenant_use_case.execute(name="Shop A"))
     buyer = make_buyer()
-    user_repo.save(buyer)
+    run(user_repo.save(buyer))
 
     # setup product
     product = Product(
@@ -62,13 +66,13 @@ def test_refund_order_idempotent():
         price=Money(50),
         stock=10,
     )
-    product_repo.save(product)
+    run(product_repo.save(product))
 
     # setup wallet
-    credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(100))
+    run(credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(100)))
 
     # create order
-    order = create_order.execute(
+    order = run(create_order.execute(
             actor_user_id=buyer.id,
             tenant_id=tenant.id,
             user_id=buyer.id,
@@ -79,23 +83,23 @@ def test_refund_order_idempotent():
                         unit_price=Money(50)
                   )
             ],
-            idempotency_key="order-123")
+            idempotency_key="order-123"))
 
     # refund (first call)
-    refunded_1 = refund_order.execute(
+    refunded_1 = run(refund_order.execute(
         actor_user_id=buyer.id,
         tenant_id=tenant.id,
         order_id=order.id,
         idempotency_key="refund-123",
-    )
+    ))
 
     # refund (retry)
-    refunded_2 = refund_order.execute(
+    refunded_2 = run(refund_order.execute(
         actor_user_id=buyer.id,
         tenant_id=tenant.id,
         order_id=order.id,
         idempotency_key="refund-123",
-    )
+    ))
 
     # assertions
     assert refunded_1.id == refunded_2.id
@@ -103,8 +107,8 @@ def test_refund_order_idempotent():
     # ensure an OrderRefunded event was published
     assert any(isinstance(e, OrderRefunded) for e in fake_bus.published_events)
 
-    wallet = wallet_repo.get_wallet(tenant.id, buyer.id)
+    wallet = run(wallet_repo.get_wallet(tenant.id, buyer.id))
     assert wallet.balance.amount == 100  # refunded
 
-    product = product_repo.get_by_id(tenant.id, "prod_1")
+    product = run(product_repo.get_by_id(tenant.id, "prod_1"))
     assert product.stock == 10  # stock restored

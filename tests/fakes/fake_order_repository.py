@@ -7,8 +7,8 @@ class FakeOrderRepository(OrderRepository):
     def __init__(self):
         self.orders: dict[tuple[str,str], Order] = {}
 
-    def get_by_id(self, tenant_id: str, order_id: str) -> Order:
+    async def get_by_id(self, tenant_id: str, order_id: str) -> Order:
         return self.orders.get((tenant_id, order_id))
 
-    def save(self, order):
+    async def save(self, order):
         self.orders[(order.tenant_id, order.id)] = order

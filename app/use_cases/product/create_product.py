@@ -20,7 +20,7 @@ class CreateProduct:
     user_repo: UserRepository
     event_bus: EventBus
 
-    def execute(
+    async def execute(
         self,
         actor_user_id: str,
         tenant_id: str,
@@ -28,12 +28,12 @@ class CreateProduct:
         price: Money,
         stock: int,
     ) -> Product:
-        tenant = self.tenant_repo.get_by_id(tenant_id)
+        tenant = await self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
-        ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
+        await ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
 
         if not name or not name.strip():
             raise DomainError("Product name cannot be empty")
@@ -45,7 +45,7 @@ class CreateProduct:
             raise DomainError("Stock cannot be negative")
 
         product_name = name.strip()
-        if self.product_repo.exists_by_name(tenant_id, product_name):
+        if await self.product_repo.exists_by_name(tenant_id, product_name):
             raise DomainError("Product name already in use")
 
         product = Product(
@@ -56,7 +56,7 @@ class CreateProduct:
             stock=stock,
         )
 
-        self.product_repo.save(product)
+        await self.product_repo.save(product)
         product.record_event(
             ProductCreated(
                 product_id=product.id,

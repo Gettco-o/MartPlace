@@ -1,3 +1,5 @@
+import asyncio
+
 from app.domain.entities.product import Product
 from app.domain.events.order_created import OrderCreated
 from app.domain.events.wallet_debited import WalletDebited
@@ -16,6 +18,8 @@ from tests.fakes.fake_tenant_repository import FakeTenantRepository
 from tests.fakes.fake_user_repository import FakeUserRepository
 from tests.fakes.fake_wallet_repository import FakeWalletRepository
 from tests.helpers import make_buyer
+
+run = asyncio.run
 
 
 def test_checkout_cart_creates_order_debits_wallet_and_completes_cart():
@@ -52,9 +56,9 @@ def test_checkout_cart_creates_order_debits_wallet_and_completes_cart():
         event_bus=fake_bus,
     )
 
-    tenant = create_tenant.execute(name="Shop A")
+    tenant = run(create_tenant.execute(name="Shop A"))
     buyer = make_buyer()
-    user_repo.save(buyer)
+    run(user_repo.save(buyer))
     product = Product(
         id="prod_1",
         tenant_id=tenant.id,
@@ -62,20 +66,20 @@ def test_checkout_cart_creates_order_debits_wallet_and_completes_cart():
         price=Money(5000),
         stock=10,
     )
-    product_repo.save(product)
+    run(product_repo.save(product))
 
-    credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(15000), reference_id="topup-1")
-    add_to_cart.execute(buyer.id, buyer.id, tenant.id, product.id, 2)
+    run(credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(15000), reference_id="topup-1"))
+    run(add_to_cart.execute(buyer.id, buyer.id, tenant.id, product.id, 2))
 
-    orders = checkout_cart.execute(actor_user_id=buyer.id, user_id=buyer.id, idempotency_key="checkout-123")
+    orders = run(checkout_cart.execute(actor_user_id=buyer.id, user_id=buyer.id, idempotency_key="checkout-123"))
 
     assert len(orders) == 1
     assert orders[0].tenant_id == tenant.id
     assert orders[0].amount == Money(10000)
-    assert wallet_repo.get_wallet(tenant.id, buyer.id).balance == Money(5000)
-    assert wallet_repo.has_reference(tenant.id, buyer.id, orders[0].id)
-    assert product_repo.get_by_id(tenant.id, product.id).stock == 8
-    completed_cart = cart_repo.get_by_user(buyer.id)
+    assert run(wallet_repo.get_wallet(tenant.id, buyer.id)).balance == Money(5000)
+    assert run(wallet_repo.has_reference(tenant.id, buyer.id, orders[0].id))
+    assert run(product_repo.get_by_id(tenant.id, product.id)).stock == 8
+    completed_cart = run(cart_repo.get_by_user(buyer.id))
     assert completed_cart.status == CartStatus.COMPLETED
     assert len(completed_cart.items) == 1
     assert any(isinstance(event, WalletDebited) for event in fake_bus.published_events)
@@ -116,9 +120,9 @@ def test_add_to_cart_after_checkout_creates_a_new_active_cart():
         event_bus=fake_bus,
     )
 
-    tenant = create_tenant.execute(name="Shop A")
+    tenant = run(create_tenant.execute(name="Shop A"))
     buyer = make_buyer()
-    user_repo.save(buyer)
+    run(user_repo.save(buyer))
     product = Product(
         id="prod_1",
         tenant_id=tenant.id,
@@ -126,13 +130,13 @@ def test_add_to_cart_after_checkout_creates_a_new_active_cart():
         price=Money(5000),
         stock=10,
     )
-    product_repo.save(product)
+    run(product_repo.save(product))
 
-    credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(20000), reference_id="topup-1")
-    first_cart = add_to_cart.execute(buyer.id, buyer.id, tenant.id, product.id, 1)
-    checkout_cart.execute(actor_user_id=buyer.id, user_id=buyer.id, idempotency_key="checkout-123")
+    run(credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(20000), reference_id="topup-1"))
+    first_cart = run(add_to_cart.execute(buyer.id, buyer.id, tenant.id, product.id, 1))
+    run(checkout_cart.execute(actor_user_id=buyer.id, user_id=buyer.id, idempotency_key="checkout-123"))
 
-    second_cart = add_to_cart.execute(buyer.id, buyer.id, tenant.id, product.id, 2)
+    second_cart = run(add_to_cart.execute(buyer.id, buyer.id, tenant.id, product.id, 2))
 
     assert first_cart.status == CartStatus.COMPLETED
     assert second_cart.status == CartStatus.ACTIVE

@@ -7,15 +7,15 @@ class FakeCartRepository(CartRepository):
     def __init__(self):
         self.carts: dict[str, Cart] = {}
 
-    def get_by_user(self, user_id: str) -> Cart | None:
+    async def get_by_user(self, user_id: str) -> Cart | None:
         return self.carts.get(user_id)
 
-    def save(self, cart: Cart) -> None:
+    async def save(self, cart: Cart) -> None:
         self.carts[cart.user_id] = cart
 
-    def delete(self, user_id: str) -> None:
+    async def delete(self, user_id: str) -> None:
         if user_id in self.carts:
             del self.carts[user_id]
 
-    def list_all(self) -> list[Cart]:
+    async def list_all(self) -> list[Cart]:
         return list(self.carts.values())

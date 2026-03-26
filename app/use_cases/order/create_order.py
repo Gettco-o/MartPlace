@@ -34,7 +34,7 @@ class CreateOrder:
             event_bus=self.event_bus,
         )
 
-    def execute(
+    async def execute(
         self,
         actor_user_id: str,
         tenant_id: str,
@@ -44,18 +44,18 @@ class CreateOrder:
     ) -> Order:
         operation = IdempotentOperation.CREATE_ORDER
 
-        existing = self.idempotency_repo.get(idempotency_key, operation)
+        existing = await self.idempotency_repo.get(idempotency_key, operation)
         if existing:
-            return self.order_repo.get_by_id(tenant_id, existing.result_id)
+            return await self.order_repo.get_by_id(tenant_id, existing.result_id)
 
-        order = self.place_order.execute(
+        order = await self.place_order.execute(
             actor_user_id=actor_user_id,
             tenant_id=tenant_id,
             user_id=user_id,
             items=items,
         )
 
-        self.idempotency_repo.save(
+        await self.idempotency_repo.save(
             IdempotencyRecord(
                 key=idempotency_key,
                 operation=operation,

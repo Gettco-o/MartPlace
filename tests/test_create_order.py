@@ -1,3 +1,5 @@
+import asyncio
+
 from app.domain.value_objects.order_item import OrderItem
 from app.use_cases.order.create_order import CreateOrder
 from app.use_cases.tenant.create_tenant import CreateTenant
@@ -13,6 +15,8 @@ from app.domain.entities.product import Product
 from app.domain.value_objects.money import Money
 from app.domain.events.order_created import OrderCreated
 from tests.helpers import make_buyer
+
+run = asyncio.run
 
 
 def test_create_order_idempotent():
@@ -37,9 +41,9 @@ def test_create_order_idempotent():
 
       t_use_case = CreateTenant(tenant_repo, fake_bus)
 
-      tenant = t_use_case.execute(name="Shop A")
+      tenant = run(t_use_case.execute(name="Shop A"))
       buyer = make_buyer()
-      user_repo.save(buyer)
+      run(user_repo.save(buyer))
 
       product = Product(
             id="prod_1",
@@ -48,11 +52,11 @@ def test_create_order_idempotent():
             price=Money(50),
             stock=100,
       )
-      product_repo.save(product)
+      run(product_repo.save(product))
 
-      credit_uc.execute(buyer.id, tenant.id, buyer.id, Money(150))
+      run(credit_uc.execute(buyer.id, tenant.id, buyer.id, Money(150)))
 
-      order1 = create_order_uc.execute(
+      order1 = run(create_order_uc.execute(
             actor_user_id=buyer.id,
             tenant_id=tenant.id,
             user_id=buyer.id,
@@ -64,9 +68,9 @@ def test_create_order_idempotent():
                   )
             ],
             idempotency_key="abc-123",
-      )
+      ))
 
-      order2 = create_order_uc.execute(
+      order2 = run(create_order_uc.execute(
             actor_user_id=buyer.id,
             tenant_id=tenant.id,
             user_id=buyer.id,
@@ -78,9 +82,9 @@ def test_create_order_idempotent():
                   )
             ],
             idempotency_key="abc-123",
-      )
+      ))
 
       assert order1.id == order2.id
       # ensure the OrderCreated event was published
       assert any(isinstance(e, OrderCreated) for e in fake_bus.published_events)
-      assert wallet_repo.get_wallet(tenant.id, buyer.id).balance.amount == 50
+      assert run(wallet_repo.get_wallet(tenant.id, buyer.id)).balance.amount == 50

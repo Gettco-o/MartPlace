@@ -8,7 +8,7 @@ class FakeWalletRepository(WalletRepository):
     def __init__(self):
         self.entries: dict[tuple[str, str], list[LedgerEntry]] = {}
 
-    def get_wallet(self, tenant_id: str, user_id: str) -> Wallet | None:
+    async def get_wallet(self, tenant_id: str, user_id: str) -> Wallet | None:
         key = (tenant_id, user_id)
         if key not in self.entries:
             return None
@@ -19,11 +19,11 @@ class FakeWalletRepository(WalletRepository):
             entries=list(self.entries[key]),
         )
 
-    def append_entry(self, entry: LedgerEntry) -> None:
+    async def append_entry(self, entry: LedgerEntry) -> None:
         key = (entry.tenant_id, entry.user_id)
         self.entries.setdefault(key, []).append(entry)
 
-    def has_reference(self, tenant_id: str, user_id: str, reference_id: str) -> bool:
+    async def has_reference(self, tenant_id: str, user_id: str, reference_id: str) -> bool:
         key = (tenant_id, user_id)
         return any(
             entry.reference_id == reference_id

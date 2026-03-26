@@ -17,7 +17,7 @@ class CreditWallet:
     user_repository: UserRepository
     event_bus: EventBus
 
-    def execute(
+    async def execute(
         self,
         actor_user_id: str,
         tenant_id: str,
@@ -25,14 +25,14 @@ class CreditWallet:
         amount: Money,
         reference_id: str | None = None,
     ) -> Wallet:
-        tenant = self.tenant_repository.get_by_id(tenant_id)
+        tenant = await self.tenant_repository.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
-        ensure_active_buyer(self.user_repository, actor_user_id, user_id)
+        await ensure_active_buyer(self.user_repository, actor_user_id, user_id)
 
-        wallet = self.wallet_repository.get_wallet(tenant_id, user_id)
+        wallet = await self.wallet_repository.get_wallet(tenant_id, user_id)
         if wallet is None:
             wallet = Wallet(
                 tenant_id=tenant_id,
@@ -40,11 +40,11 @@ class CreditWallet:
             )
 
         reference_id = reference_id or f"wallet-credit:{uuid.uuid4()}"
-        if self.wallet_repository.has_reference(tenant_id, user_id, reference_id):
-            return self.wallet_repository.get_wallet(tenant_id, user_id)
+        if await self.wallet_repository.has_reference(tenant_id, user_id, reference_id):
+            return await self.wallet_repository.get_wallet(tenant_id, user_id)
 
         entry = wallet.credit(amount, reference_id=reference_id)
-        self.wallet_repository.append_entry(entry)
+        await self.wallet_repository.append_entry(entry)
         self.event_bus.publish(wallet.events)
         wallet.clear_events()
 

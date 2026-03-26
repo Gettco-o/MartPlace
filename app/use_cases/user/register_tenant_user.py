@@ -10,6 +10,7 @@ from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.user_repository import UserRepository
 from app.use_cases.auth import ensure_tenant_manager
+from werkzeug.security import generate_password_hash
 
 
 @dataclass
@@ -18,7 +19,7 @@ class RegisterTenantUser:
     tenant_repo: TenantRepository
     event_bus: EventBus
 
-    def execute(
+    async def execute(
         self,
         actor_user_id: str,
         email: str,
@@ -28,12 +29,12 @@ class RegisterTenantUser:
         password: str,
     ) -> User:
 
-        tenant = self.tenant_repo.get_by_id(tenant_id)
+        tenant = await self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
-        ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
+        await ensure_tenant_manager(self.user_repo, actor_user_id, tenant_id)
 
         if role not in (
             UserRole.TENANT_ADMIN,
@@ -41,19 +42,19 @@ class RegisterTenantUser:
         ):
             raise DomainError("Invalid role for tenant user")
 
-        if self.user_repo.get_by_email(email):
+        if await self.user_repo.get_by_email(email):
             raise DomainError("Email already registered")
 
         user = User(
             id=str(uuid.uuid4()),
             email=email.strip().lower(),
             name=name,
-            password=password,
+            password=generate_password_hash(password),
             role=role,
             tenant_id=tenant_id,
         )
 
-        self.user_repo.save(user)
+        await self.user_repo.save(user)
         user.record_event(
             TenantUserRegistered(
                 user_id=user.id,
