@@ -7,6 +7,7 @@ from app.infrastructure.web.schemas.auth import (
 )
 from app.infrastructure.web.schemas.products import (
     CreateProductRequest,
+    ProductUpdateRequest,
     ProductSchema,
     ProductResponse,
 )
@@ -30,6 +31,7 @@ __all__ = [
     "LogoutResponse",
     "ProductSchema",
     "ProductResponse",
+    "ProductUpdateRequest",
     "RefreshTokenRequest",
     "RefreshTokensResponse",
     "RegisterBuyerRequest",

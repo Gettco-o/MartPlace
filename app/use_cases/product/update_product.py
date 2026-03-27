@@ -26,9 +26,9 @@ class UpdateProduct:
         actor_user_id: str,
         tenant_id: str,
         product_id: str,
-        name: str,
-        price: Money,
-        stock: int,
+        name: str | None = None,
+        price: Money | None = None,
+        stock: int | None = None,
     ) -> Product:
         tenant = await self.tenant_repo.get_by_id(tenant_id)
         if not tenant:
@@ -41,33 +41,41 @@ class UpdateProduct:
         if not product:
             raise DomainError("Product not found")
 
-        if not name or not name.strip():
-            raise DomainError("Product name cannot be empty")
+        if name is None and price is None and stock is None:
+            raise DomainError("At least one field must be provided for update")
 
-        if price.amount <= 0:
-            raise DomainError("Price must be greater than zero")
+        if name is not None:
+            if not name.strip():
+                raise DomainError("Product name cannot be empty")
 
-        if stock < 0:
-            raise DomainError("Stock cannot be negative")
+            product_name = name.strip()
+            if product_name != product.name and await self.product_repo.exists_by_name(
+                tenant_id, product_name
+            ):
+                raise DomainError("Product name already in use")
+            product.name = product_name
 
-        product_name = name.strip()
-        if product_name != product.name and await self.product_repo.exists_by_name(
-            tenant_id, product_name
-        ):
-            raise DomainError("Product name already in use")
+        price_changed = False
+        if price is not None:
+            if price.amount <= 0:
+                raise DomainError("Price must be greater than zero")
+            price_changed = price.amount != product.price.amount
+            product.price = price
 
-        product.name = product_name
-        product.price = price
-        product.stock = stock
+        if stock is not None:
+            if stock < 0:
+                raise DomainError("Stock cannot be negative")
+            product.stock = stock
 
         await self.product_repo.save(product)
-        for cart in await self.cart_repo.list_all():
-            cart.refresh_item_price(
-                product_id=product.id,
-                tenant_id=tenant_id,
-                unit_price=product.price,
-            )
-            await self.cart_repo.save(cart)
+        if price_changed:
+            for cart in await self.cart_repo.list_all():
+                cart.refresh_item_price(
+                    product_id=product.id,
+                    tenant_id=tenant_id,
+                    unit_price=product.price,
+                )
+                await self.cart_repo.save(cart)
 
         product.record_event(
             ProductUpdated(

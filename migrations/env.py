@@ -9,7 +9,17 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from app.infrastructure.db import Base
 from app.infrastructure.db.config import DatabaseConfig
-from app.infrastructure.db.models import ProductModel, TenantModel, UserModel
+from app.infrastructure.db.models import (
+    CartItemModel,
+    CartModel,
+    IdempotencyRecordModel,
+    LedgerEntryModel,
+    OrderItemModel,
+    OrderModel,
+    ProductModel,
+    TenantModel,
+    UserModel,
+)
 
 config = context.config
 

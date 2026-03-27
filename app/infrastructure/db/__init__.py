@@ -1,6 +1,14 @@
 from app.infrastructure.db.base import Base
 from app.infrastructure.db.config import DatabaseConfig
 from app.infrastructure.db.mappers import (
+    cart_to_entity,
+    cart_to_model,
+    idempotency_to_entity,
+    idempotency_to_model,
+    ledger_entry_to_entity,
+    ledger_entry_to_model,
+    order_to_entity,
+    order_to_model,
     product_to_entity,
     product_to_model,
     tenant_to_entity,
@@ -8,11 +16,25 @@ from app.infrastructure.db.mappers import (
     user_to_entity,
     user_to_model,
 )
-from app.infrastructure.db.models import ProductModel, TenantModel, UserModel
+from app.infrastructure.db.models import (
+    CartItemModel,
+    CartModel,
+    IdempotencyRecordModel,
+    LedgerEntryModel,
+    OrderItemModel,
+    OrderModel,
+    ProductModel,
+    TenantModel,
+    UserModel,
+)
 from app.infrastructure.db.repositories import (
+    SqlAlchemyCartRepository,
+    SqlAlchemyIdempotencyRepository,
+    SqlAlchemyOrderRepository,
     SqlAlchemyProductRepository,
     SqlAlchemyTenantRepository,
     SqlAlchemyUserRepository,
+    SqlAlchemyWalletRepository,
 )
 from app.infrastructure.db.session import Database
 
@@ -20,16 +42,34 @@ __all__ = [
     "Base",
     "Database",
     "DatabaseConfig",
+    "CartItemModel",
+    "CartModel",
+    "IdempotencyRecordModel",
+    "LedgerEntryModel",
+    "OrderItemModel",
+    "OrderModel",
     "TenantModel",
     "UserModel",
     "ProductModel",
+    "cart_to_model",
+    "cart_to_entity",
+    "order_to_model",
+    "order_to_entity",
+    "ledger_entry_to_model",
+    "ledger_entry_to_entity",
+    "idempotency_to_model",
+    "idempotency_to_entity",
     "tenant_to_model",
     "tenant_to_entity",
     "user_to_model",
     "user_to_entity",
     "product_to_model",
     "product_to_entity",
+    "SqlAlchemyCartRepository",
+    "SqlAlchemyIdempotencyRepository",
+    "SqlAlchemyOrderRepository",
     "SqlAlchemyTenantRepository",
     "SqlAlchemyUserRepository",
     "SqlAlchemyProductRepository",
+    "SqlAlchemyWalletRepository",
 ]

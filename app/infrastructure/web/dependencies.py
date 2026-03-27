@@ -7,8 +7,10 @@ from app.infrastructure.db.repositories import (
     SqlAlchemyTenantRepository,
     SqlAlchemyUserRepository,
 )
+from app.infrastructure.db.repositories.cart_repository import SqlAlchemyCartRepository
 from app.use_cases.product.create_product import CreateProduct
 from app.use_cases.product.get_product import GetProduct
+from app.use_cases.product.update_product import UpdateProduct
 from app.use_cases.tenant.create_tenant import CreateTenant
 from app.use_cases.tenant.get_tenant import GetTenant
 from app.use_cases.user.authenticate_user import AuthenticateUser
@@ -26,6 +28,7 @@ async def request_services():
         tenant_repo = SqlAlchemyTenantRepository(session)
         user_repo = SqlAlchemyUserRepository(session)
         product_repo = SqlAlchemyProductRepository(session)
+        cart_repo = SqlAlchemyCartRepository(session)
 
         yield {
             "session": session,
@@ -53,4 +56,11 @@ async def request_services():
                 event_bus=event_bus,
             ),
             "get_product": GetProduct(product_repo=product_repo),
+            "update_product": UpdateProduct(
+                cart_repo=cart_repo,
+                product_repo=product_repo,
+                tenant_repo=tenant_repo,
+                user_repo=user_repo,
+                event_bus=event_bus
+            )
         }

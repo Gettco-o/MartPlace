@@ -34,3 +34,9 @@ class ProductSchema:
 class ProductResponse:
     success: bool
     product: ProductSchema
+
+@dataclass
+class ProductUpdateRequest:
+    name: str | None = None
+    price_amount: int | None = None
+    stock: int | None = None

@@ -33,6 +33,60 @@ def create_app():
       async def handle_authentication_error(error: AuthenticationError):
             return jsonify({"success": False, "error": str(error)}), 401
 
+      @app.errorhandler(422)
+      def unprocessable(error):
+            return jsonify({
+                  "success": False,
+                  "error": str(error)
+            }), 422
+
+
+      @app.errorhandler(404)
+      def resource_not_found(error):
+            return jsonify(
+                  {
+                  "success": False,
+                  "error": str(error)
+                  }
+            ), 404
+
+      @app.errorhandler(400)
+      def bad_request(error):
+            return jsonify(
+                  {
+                  "success": False,
+                  "error": str(error)
+                  }
+            ), 400
+
+
+      @app.errorhandler(401)
+      def unauthorized(error):
+            return jsonify(
+                  {
+                  "success": False,
+                  "error": str(error)
+                  }
+            )
+
+      @app.errorhandler(405)
+      def method_not_allowed(error):
+            return jsonify(
+                  {
+                  "success": False,
+                  "error": str(error)
+                  }
+            ), 405
+      
+      @app.errorhandler(500)
+      def internal_server_error(error):
+            return jsonify(
+                  {
+                        "success": False,
+                        "error": str(error)
+                  }
+            )
+
       @app.get("/health")
       @tag(["system"])
       async def health():

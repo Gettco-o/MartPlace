@@ -10,6 +10,7 @@ from app.infrastructure.web.schemas import (
     CreateProductRequest,
     ProductResponse,
     ProductSchema,
+    ProductUpdateRequest,
 )
 from app.infrastructure.web.utils import success
 
@@ -42,5 +43,26 @@ async def create_product(data: CreateProductRequest):
 async def get_product(tenant_id: str, product_id: str):
     async with request_services() as services:
         product = await services["get_product"].execute(tenant_id, product_id)
+
+    return success({"product": asdict(ProductSchema.from_entity(product))})
+
+
+@products.patch("/<tenant_id>/<product_id>/update")
+@validate_request(ProductUpdateRequest)
+@auth_required
+@validate_response(ProductResponse)
+async def update_product(tenant_id: str, product_id: str, data: ProductUpdateRequest):
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        product = await services["update_product"].execute(
+            actor_user_id=actor_user_id,
+            tenant_id=tenant_id,
+            product_id=product_id,
+            name=data.name,
+            price=Money(data.price_amount) if data.price_amount is not None else None,
+            stock=data.stock,
+        )
+        await services["session"].commit()
 
     return success({"product": asdict(ProductSchema.from_entity(product))})

@@ -275,10 +275,74 @@ def test_update_product_invalid_values_raise():
             actor_user_id=tenant_user.id,
             tenant_id=tenant.id,
             product_id="prod_1",
-            name="Product A",
-            price=Money(1000),
             stock=-1,
         ))
+
+
+def test_update_product_requires_at_least_one_field():
+    tenant_repo = FakeTenantRepository()
+    product_repo = FakeProductRepository()
+    cart_repo = FakeCartRepository()
+    user_repo = FakeUserRepository()
+    fake_bus = FakeEventBus()
+
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    update_product = UpdateProduct(cart_repo, product_repo, tenant_repo, user_repo, fake_bus)
+
+    tenant = run(create_tenant.execute("Shop A"))
+    tenant_user = make_tenant_user(tenant.id)
+    run(user_repo.save(tenant_user))
+    run(product_repo.save(
+        Product(
+            id="prod_1",
+            tenant_id=tenant.id,
+            name="Product A",
+            price=Money(1000),
+            stock=1,
+        )
+    ))
+
+    with pytest.raises(DomainError, match="At least one field must be provided for update"):
+        run(update_product.execute(
+            actor_user_id=tenant_user.id,
+            tenant_id=tenant.id,
+            product_id="prod_1",
+        ))
+
+
+def test_update_product_allows_partial_stock_only_update():
+    tenant_repo = FakeTenantRepository()
+    product_repo = FakeProductRepository()
+    cart_repo = FakeCartRepository()
+    user_repo = FakeUserRepository()
+    fake_bus = FakeEventBus()
+
+    create_tenant = CreateTenant(tenant_repo, fake_bus)
+    update_product = UpdateProduct(cart_repo, product_repo, tenant_repo, user_repo, fake_bus)
+
+    tenant = run(create_tenant.execute("Shop A"))
+    tenant_user = make_tenant_user(tenant.id)
+    run(user_repo.save(tenant_user))
+    run(product_repo.save(
+        Product(
+            id="prod_1",
+            tenant_id=tenant.id,
+            name="Product A",
+            price=Money(1000),
+            stock=1,
+        )
+    ))
+
+    updated = run(update_product.execute(
+        actor_user_id=tenant_user.id,
+        tenant_id=tenant.id,
+        product_id="prod_1",
+        stock=9,
+    ))
+
+    assert updated.name == "Product A"
+    assert updated.price == Money(1000)
+    assert updated.stock == 9
 
 
 def test_update_product_refreshes_active_cart_item_prices():
