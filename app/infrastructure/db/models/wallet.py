@@ -10,16 +10,10 @@ from app.infrastructure.db.base import Base
 class LedgerEntryModel(Base):
     __tablename__ = "ledger_entries"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "user_id", "reference_id", name="uq_ledger_entries_reference"),
+        UniqueConstraint("user_id", "reference_id", name="uq_ledger_entries_reference"),
     )
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
-    tenant_id: Mapped[str] = mapped_column(
-        String(64),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
-        nullable=False,
-        index=True,
-    )
     user_id: Mapped[str] = mapped_column(
         String(64),
         ForeignKey("users.id", ondelete="CASCADE"),

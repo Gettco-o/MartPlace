@@ -28,7 +28,7 @@ def test_create_order_idempotent():
       user_repo = FakeUserRepository()
       fake_bus = FakeEventBus()
 
-      credit_uc = CreditWallet(wallet_repo, tenant_repo, user_repo, fake_bus)
+      credit_uc = CreditWallet(wallet_repo, user_repo, fake_bus)
       create_order_uc = CreateOrder(
             order_repo=order_repo,
             product_repo=product_repo,
@@ -54,7 +54,7 @@ def test_create_order_idempotent():
       )
       run(product_repo.save(product))
 
-      run(credit_uc.execute(buyer.id, tenant.id, buyer.id, Money(150)))
+      run(credit_uc.execute(buyer.id, buyer.id, Money(150)))
 
       order1 = run(create_order_uc.execute(
             actor_user_id=buyer.id,
@@ -87,4 +87,4 @@ def test_create_order_idempotent():
       assert order1.id == order2.id
       # ensure the OrderCreated event was published
       assert any(isinstance(e, OrderCreated) for e in fake_bus.published_events)
-      assert run(wallet_repo.get_wallet(tenant.id, buyer.id)).balance.amount == 50
+      assert run(wallet_repo.get_wallet(buyer.id)).balance.amount == 50

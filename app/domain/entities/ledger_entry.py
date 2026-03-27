@@ -14,7 +14,6 @@ class LedgerEntryType(str, Enum):
 @dataclass(frozen=True)
 class LedgerEntry:
     id: str
-    tenant_id: str
     user_id: str
     amount: Money
     entry_type: LedgerEntryType
@@ -24,14 +23,12 @@ class LedgerEntry:
     @classmethod
     def create_credit(
         cls,
-        tenant_id: str,
         user_id: str,
         amount: Money,
         reference_id: str,
     ) -> "LedgerEntry":
         return cls(
             id=str(uuid.uuid4()),
-            tenant_id=tenant_id,
             user_id=user_id,
             amount=amount,
             entry_type=LedgerEntryType.CREDIT,
@@ -41,14 +38,12 @@ class LedgerEntry:
     @classmethod
     def create_debit(
         cls,
-        tenant_id: str,
         user_id: str,
         amount: Money,
         reference_id: str,
     ) -> "LedgerEntry":
         return cls(
             id=str(uuid.uuid4()),
-            tenant_id=tenant_id,
             user_id=user_id,
             amount=amount,
             entry_type=LedgerEntryType.DEBIT,

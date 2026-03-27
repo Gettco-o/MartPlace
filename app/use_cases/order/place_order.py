@@ -56,7 +56,7 @@ class PlaceOrder:
             normalized_items.append(normalized_item)
             total_amount = total_amount.add(normalized_item.total())
 
-        wallet = await self.wallet_repo.get_wallet(tenant_id, user_id)
+        wallet = await self.wallet_repo.get_wallet(user_id)
         if wallet is None:
             raise DomainError("Wallet does not exist")
 

@@ -11,7 +11,6 @@ from app.domain.value_objects.money import Money
 
 @dataclass
 class Wallet(EntityWithEvents):
-    tenant_id: str
     user_id: str
     entries: list[LedgerEntry] = field(default_factory=list)
 
@@ -37,7 +36,6 @@ class Wallet(EntityWithEvents):
             raise InsufficientFundsError("Insufficient funds")
 
         entry = LedgerEntry.create_debit(
-            tenant_id=self.tenant_id,
             user_id=self.user_id,
             amount=amount,
             reference_id=reference_id,
@@ -45,7 +43,6 @@ class Wallet(EntityWithEvents):
         self.entries.append(entry)
         self.record_event(
             WalletDebited(
-                tenant_id=self.tenant_id,
                 user_id=self.user_id,
                 amount=amount.amount,
                 balance=self.balance.amount,
@@ -59,7 +56,6 @@ class Wallet(EntityWithEvents):
             raise InvalidAmountError("Amount must be positive")
 
         entry = LedgerEntry.create_credit(
-            tenant_id=self.tenant_id,
             user_id=self.user_id,
             amount=amount,
             reference_id=reference_id,
@@ -67,7 +63,6 @@ class Wallet(EntityWithEvents):
         self.entries.append(entry)
         self.record_event(
             WalletCredited(
-                tenant_id=self.tenant_id,
                 user_id=self.user_id,
                 amount=amount.amount,
                 balance=self.balance.amount,

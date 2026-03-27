@@ -400,7 +400,7 @@ def test_update_product_does_not_refresh_completed_cart_prices():
     create_tenant = CreateTenant(tenant_repo, fake_bus)
     update_product = UpdateProduct(cart_repo, product_repo, tenant_repo, user_repo, fake_bus)
     add_to_cart = AddToCart(cart_repo, product_repo, tenant_repo, user_repo)
-    credit_wallet = CreditWallet(wallet_repo, tenant_repo, user_repo, fake_bus)
+    credit_wallet = CreditWallet(wallet_repo, user_repo, fake_bus)
     checkout_cart = CheckoutCart(
         cart_repo=cart_repo,
         product_repo=product_repo,
@@ -427,7 +427,7 @@ def test_update_product_does_not_refresh_completed_cart_prices():
     )
     run(product_repo.save(product))
 
-    run(credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(10000), reference_id="topup-1"))
+    run(credit_wallet.execute(buyer.id, buyer.id, Money(10000), reference_id="topup-1"))
     run(add_to_cart.execute(buyer.id, buyer.id, tenant.id, product.id, 1))
     run(checkout_cart.execute(buyer.id, buyer.id, "checkout-1"))
 

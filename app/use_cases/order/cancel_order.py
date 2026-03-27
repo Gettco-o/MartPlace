@@ -37,7 +37,7 @@ class CancelOrder:
             product.increase_stock(item.quantity)
             await self.product_repo.save(product)
 
-        wallet = await self.wallet_repo.get_wallet(tenant_id, order.user_id)
+        wallet = await self.wallet_repo.get_wallet(order.user_id)
         if wallet is None:
             raise DomainError("Wallet does not exist")
 

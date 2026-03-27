@@ -171,13 +171,11 @@ def order_to_entity(model: OrderModel) -> Order:
 def ledger_entry_to_model(entity: LedgerEntry, model: LedgerEntryModel | None = None) -> LedgerEntryModel:
     model = model or LedgerEntryModel(
         id=entity.id,
-        tenant_id=entity.tenant_id,
         user_id=entity.user_id,
         amount=entity.amount.amount,
         entry_type=entity.entry_type,
         reference_id=entity.reference_id,
     )
-    model.tenant_id = entity.tenant_id
     model.user_id = entity.user_id
     model.amount = entity.amount.amount
     model.entry_type = entity.entry_type
@@ -188,7 +186,6 @@ def ledger_entry_to_model(entity: LedgerEntry, model: LedgerEntryModel | None = 
 def ledger_entry_to_entity(model: LedgerEntryModel) -> LedgerEntry:
     return LedgerEntry(
         id=model.id,
-        tenant_id=model.tenant_id,
         user_id=model.user_id,
         amount=Money(model.amount),
         entry_type=model.entry_type,

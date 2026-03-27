@@ -11,11 +11,10 @@ class SqlAlchemyWalletRepository(WalletRepository):
     def __init__(self, session) -> None:
         self.session = session
 
-    async def get_wallet(self, tenant_id: str, user_id: str) -> Wallet | None:
+    async def get_wallet(self, user_id: str) -> Wallet | None:
         stmt = (
             select(LedgerEntryModel)
             .where(
-                LedgerEntryModel.tenant_id == tenant_id,
                 LedgerEntryModel.user_id == user_id,
             )
             .order_by(LedgerEntryModel.created_at.asc(), LedgerEntryModel.id.asc())
@@ -24,7 +23,7 @@ class SqlAlchemyWalletRepository(WalletRepository):
         entries = [ledger_entry_to_entity(model) for model in result.all()]
         if not entries:
             return None
-        return Wallet(tenant_id=tenant_id, user_id=user_id, entries=entries)
+        return Wallet(user_id=user_id, entries=entries)
 
     async def append_entry(self, entry: LedgerEntry) -> None:
         model = await self.session.get(LedgerEntryModel, entry.id)
@@ -32,9 +31,8 @@ class SqlAlchemyWalletRepository(WalletRepository):
         self.session.add(model)
         await self.session.flush()
 
-    async def has_reference(self, tenant_id: str, user_id: str, reference_id: str) -> bool:
+    async def has_reference(self, user_id: str, reference_id: str) -> bool:
         stmt = select(LedgerEntryModel.id).where(
-            LedgerEntryModel.tenant_id == tenant_id,
             LedgerEntryModel.user_id == user_id,
             LedgerEntryModel.reference_id == reference_id,
         )

@@ -6,26 +6,22 @@ from app.domain.entities.wallet import Wallet
 class FakeWalletRepository(WalletRepository):
 
     def __init__(self):
-        self.entries: dict[tuple[str, str], list[LedgerEntry]] = {}
+        self.entries: dict[str, list[LedgerEntry]] = {}
 
-    async def get_wallet(self, tenant_id: str, user_id: str) -> Wallet | None:
-        key = (tenant_id, user_id)
-        if key not in self.entries:
+    async def get_wallet(self, user_id: str) -> Wallet | None:
+        if user_id not in self.entries:
             return None
 
         return Wallet(
-            tenant_id=tenant_id,
             user_id=user_id,
-            entries=list(self.entries[key]),
+            entries=list(self.entries[user_id]),
         )
 
     async def append_entry(self, entry: LedgerEntry) -> None:
-        key = (entry.tenant_id, entry.user_id)
-        self.entries.setdefault(key, []).append(entry)
+        self.entries.setdefault(entry.user_id, []).append(entry)
 
-    async def has_reference(self, tenant_id: str, user_id: str, reference_id: str) -> bool:
-        key = (tenant_id, user_id)
+    async def has_reference(self, user_id: str, reference_id: str) -> bool:
         return any(
             entry.reference_id == reference_id
-            for entry in self.entries.get(key, [])
+            for entry in self.entries.get(user_id, [])
         )

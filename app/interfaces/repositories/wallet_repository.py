@@ -6,7 +6,7 @@ from app.domain.entities.wallet import Wallet
 
 class WalletRepository(ABC):
     @abstractmethod
-    async def get_wallet(self, tenant_id: str, user_id: str) -> Wallet | None:
+    async def get_wallet(self, user_id: str) -> Wallet | None:
         pass
 
     @abstractmethod
@@ -14,5 +14,5 @@ class WalletRepository(ABC):
         pass
 
     @abstractmethod
-    async def has_reference(self, tenant_id: str, user_id: str, reference_id: str) -> bool:
+    async def has_reference(self, user_id: str, reference_id: str) -> bool:
         pass

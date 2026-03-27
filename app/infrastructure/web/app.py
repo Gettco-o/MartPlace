@@ -3,7 +3,7 @@ import os
 from dotenv import load_dotenv
 from quart import Quart, jsonify
 from quart_schema import tag
-
+from quart_cors import cors
 from app.domain.exceptions import DomainError
 from app.infrastructure.web.auth import AuthenticationError
 from app.infrastructure.web.extensions import db, event_bus, qs
@@ -12,6 +12,7 @@ from app.infrastructure.web.extensions import db, event_bus, qs
 def create_app():
       load_dotenv()
       app = Quart(__name__)
+      app = cors(app)
       app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
       app.config["AUTH_TOKEN_MAX_AGE"] = int(os.getenv("AUTH_TOKEN_MAX_AGE", "900"))
       app.config["AUTH_REFRESH_TOKEN_MAX_AGE"] = int(os.getenv("AUTH_REFRESH_TOKEN_MAX_AGE", "604800"))

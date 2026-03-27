@@ -39,7 +39,7 @@ def test_order_progresses_from_paid_to_processing_to_fulfilled_to_delivered():
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
-    credit_wallet = CreditWallet(wallet_repo, tenant_repo, user_repo, fake_bus)
+    credit_wallet = CreditWallet(wallet_repo, user_repo, fake_bus)
     create_order = CreateOrder(
         order_repo,
         product_repo,
@@ -68,7 +68,7 @@ def test_order_progresses_from_paid_to_processing_to_fulfilled_to_delivered():
     )
     run(product_repo.save(product))
 
-    run(credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(15000), reference_id="topup-1"))
+    run(credit_wallet.execute(buyer.id, buyer.id, Money(15000), reference_id="topup-1"))
     order = run(create_order.execute(
         actor_user_id=buyer.id,
         tenant_id=tenant.id,
@@ -100,7 +100,7 @@ def test_buyer_can_cancel_paid_order_and_get_wallet_refund_and_stock_back():
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
-    credit_wallet = CreditWallet(wallet_repo, tenant_repo, user_repo, fake_bus)
+    credit_wallet = CreditWallet(wallet_repo, user_repo, fake_bus)
     create_order = CreateOrder(
         order_repo,
         product_repo,
@@ -132,7 +132,7 @@ def test_buyer_can_cancel_paid_order_and_get_wallet_refund_and_stock_back():
     )
     run(product_repo.save(product))
 
-    run(credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(15000), reference_id="topup-1"))
+    run(credit_wallet.execute(buyer.id, buyer.id, Money(15000), reference_id="topup-1"))
     order = run(create_order.execute(
         actor_user_id=buyer.id,
         tenant_id=tenant.id,
@@ -144,7 +144,7 @@ def test_buyer_can_cancel_paid_order_and_get_wallet_refund_and_stock_back():
     cancelled = run(cancel_order.execute(buyer.id, tenant.id, order.id))
 
     assert cancelled.status == OrderStatus.CANCELLED
-    assert run(wallet_repo.get_wallet(tenant.id, buyer.id)).balance == Money(15000)
+    assert run(wallet_repo.get_wallet(buyer.id)).balance == Money(15000)
     assert run(product_repo.get_by_id(tenant.id, product.id)).stock == 10
     assert any(isinstance(e, OrderCancelled) for e in fake_bus.published_events)
 
@@ -159,7 +159,7 @@ def test_order_rejects_invalid_lifecycle_transitions():
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
-    credit_wallet = CreditWallet(wallet_repo, tenant_repo, user_repo, fake_bus)
+    credit_wallet = CreditWallet(wallet_repo, user_repo, fake_bus)
     create_order = CreateOrder(
         order_repo,
         product_repo,
@@ -196,7 +196,7 @@ def test_order_rejects_invalid_lifecycle_transitions():
         )
     ))
 
-    run(credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(20000), reference_id="topup-1"))
+    run(credit_wallet.execute(buyer.id, buyer.id, Money(20000), reference_id="topup-1"))
     order = run(create_order.execute(
         actor_user_id=buyer.id,
         tenant_id=tenant.id,

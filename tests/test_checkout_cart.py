@@ -41,7 +41,6 @@ def test_checkout_cart_creates_order_debits_wallet_and_completes_cart():
     )
     credit_wallet = CreditWallet(
         wallet_repository=wallet_repo,
-        tenant_repository=tenant_repo,
         user_repository=user_repo,
         event_bus=fake_bus,
     )
@@ -68,7 +67,7 @@ def test_checkout_cart_creates_order_debits_wallet_and_completes_cart():
     )
     run(product_repo.save(product))
 
-    run(credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(15000), reference_id="topup-1"))
+    run(credit_wallet.execute(buyer.id, buyer.id, Money(15000), reference_id="topup-1"))
     run(add_to_cart.execute(buyer.id, buyer.id, tenant.id, product.id, 2))
 
     orders = run(checkout_cart.execute(actor_user_id=buyer.id, user_id=buyer.id, idempotency_key="checkout-123"))
@@ -76,8 +75,8 @@ def test_checkout_cart_creates_order_debits_wallet_and_completes_cart():
     assert len(orders) == 1
     assert orders[0].tenant_id == tenant.id
     assert orders[0].amount == Money(10000)
-    assert run(wallet_repo.get_wallet(tenant.id, buyer.id)).balance == Money(5000)
-    assert run(wallet_repo.has_reference(tenant.id, buyer.id, orders[0].id))
+    assert run(wallet_repo.get_wallet(buyer.id)).balance == Money(5000)
+    assert run(wallet_repo.has_reference(buyer.id, orders[0].id))
     assert run(product_repo.get_by_id(tenant.id, product.id)).stock == 8
     completed_cart = run(cart_repo.get_by_user(buyer.id))
     assert completed_cart.status == CartStatus.COMPLETED
@@ -105,7 +104,6 @@ def test_add_to_cart_after_checkout_creates_a_new_active_cart():
     )
     credit_wallet = CreditWallet(
         wallet_repository=wallet_repo,
-        tenant_repository=tenant_repo,
         user_repository=user_repo,
         event_bus=fake_bus,
     )
@@ -132,7 +130,7 @@ def test_add_to_cart_after_checkout_creates_a_new_active_cart():
     )
     run(product_repo.save(product))
 
-    run(credit_wallet.execute(buyer.id, tenant.id, buyer.id, Money(20000), reference_id="topup-1"))
+    run(credit_wallet.execute(buyer.id, buyer.id, Money(20000), reference_id="topup-1"))
     first_cart = run(add_to_cart.execute(buyer.id, buyer.id, tenant.id, product.id, 1))
     run(checkout_cart.execute(actor_user_id=buyer.id, user_id=buyer.id, idempotency_key="checkout-123"))
 
