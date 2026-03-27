@@ -96,15 +96,31 @@ def cart_to_model(entity: Cart, model: CartModel | None = None) -> CartModel:
     model = model or CartModel(id=entity.id, user_id=entity.user_id, status=entity.status)
     model.user_id = entity.user_id
     model.status = entity.status
-    model.items = [
-        CartItemModel(
-            product_id=item.product_id,
-            tenant_id=item.tenant_id,
-            quantity=item.quantity,
-            unit_price_amount=item.unit_price.amount,
-        )
-        for item in entity.items
-    ]
+
+    existing_items = {
+        (item.product_id, item.tenant_id): item
+        for item in model.items
+    }
+    reconciled_items: list[CartItemModel] = []
+
+    for item in entity.items:
+        key = (item.product_id, item.tenant_id)
+        item_model = existing_items.pop(key, None)
+
+        if item_model is None:
+            item_model = CartItemModel(
+                product_id=item.product_id,
+                tenant_id=item.tenant_id,
+                quantity=item.quantity,
+                unit_price_amount=item.unit_price.amount,
+            )
+        else:
+            item_model.quantity = item.quantity
+            item_model.unit_price_amount = item.unit_price.amount
+
+        reconciled_items.append(item_model)
+
+    model.items = reconciled_items
     return model
 
 
@@ -138,14 +154,29 @@ def order_to_model(entity: Order, model: OrderModel | None = None) -> OrderModel
     model.user_id = entity.user_id
     model.amount = entity.amount.amount
     model.status = entity.status
-    model.items = [
-        OrderItemModel(
-            product_id=item.product_id,
-            quantity=item.quantity,
-            unit_price_amount=item.unit_price.amount,
-        )
-        for item in entity.items
-    ]
+
+    existing_items = {
+        item.product_id: item
+        for item in model.items
+    }
+    reconciled_items: list[OrderItemModel] = []
+
+    for item in entity.items:
+        item_model = existing_items.pop(item.product_id, None)
+
+        if item_model is None:
+            item_model = OrderItemModel(
+                product_id=item.product_id,
+                quantity=item.quantity,
+                unit_price_amount=item.unit_price.amount,
+            )
+        else:
+            item_model.quantity = item.quantity
+            item_model.unit_price_amount = item.unit_price.amount
+
+        reconciled_items.append(item_model)
+
+    model.items = reconciled_items
     return model
 
 

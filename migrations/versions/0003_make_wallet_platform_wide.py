@@ -17,32 +17,21 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.drop_constraint("uq_ledger_entries_reference", "ledger_entries", type_="unique")
-    op.drop_constraint("ledger_entries_tenant_id_fkey", "ledger_entries", type_="foreignkey")
-    op.drop_index("ix_ledger_entries_tenant_id", table_name="ledger_entries")
-    op.drop_column("ledger_entries", "tenant_id")
-    op.create_unique_constraint(
-        "uq_ledger_entries_reference",
-        "ledger_entries",
-        ["user_id", "reference_id"],
-    )
+    with op.batch_alter_table("ledger_entries", recreate="always") as batch_op:
+        batch_op.drop_constraint("uq_ledger_entries_reference", type_="unique")
+        batch_op.drop_index("ix_ledger_entries_tenant_id")
+        batch_op.drop_column("tenant_id")
+        batch_op.create_unique_constraint(
+            "uq_ledger_entries_reference",
+            ["user_id", "reference_id"],
+        )
 
 
 def downgrade() -> None:
-    op.drop_constraint("uq_ledger_entries_reference", "ledger_entries", type_="unique")
-    op.add_column(
-        "ledger_entries",
-        sa.Column("tenant_id", sa.String(length=64), nullable=True),
-    )
-    op.create_index("ix_ledger_entries_tenant_id", "ledger_entries", ["tenant_id"], unique=False)
-    op.create_foreign_key(
-        "ledger_entries_tenant_id_fkey",
-        "ledger_entries",
-        "tenants",
-        ["tenant_id"],
-        ["id"],
-        ondelete="CASCADE",
-    )
+    with op.batch_alter_table("ledger_entries", recreate="always") as batch_op:
+        batch_op.drop_constraint("uq_ledger_entries_reference", type_="unique")
+        batch_op.add_column(sa.Column("tenant_id", sa.String(length=64), nullable=True))
+
     op.execute(
         """
         UPDATE ledger_entries
@@ -55,9 +44,18 @@ def downgrade() -> None:
         )
         """
     )
-    op.alter_column("ledger_entries", "tenant_id", nullable=False)
-    op.create_unique_constraint(
-        "uq_ledger_entries_reference",
-        "ledger_entries",
-        ["tenant_id", "user_id", "reference_id"],
-    )
+
+    with op.batch_alter_table("ledger_entries", recreate="always") as batch_op:
+        batch_op.alter_column("tenant_id", existing_type=sa.String(length=64), nullable=False)
+        batch_op.create_index("ix_ledger_entries_tenant_id", ["tenant_id"], unique=False)
+        batch_op.create_foreign_key(
+            None,
+            "tenants",
+            ["tenant_id"],
+            ["id"],
+            ondelete="CASCADE",
+        )
+        batch_op.create_unique_constraint(
+            "uq_ledger_entries_reference",
+            ["tenant_id", "user_id", "reference_id"],
+        )
