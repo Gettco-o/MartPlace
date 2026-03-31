@@ -10,12 +10,24 @@ from app.infrastructure.web.schemas import (
     CreateProductRequest,
     ProductResponse,
     ProductSchema,
+    ProductsResponse,
     ProductUpdateRequest,
 )
 from app.infrastructure.web.utils import success
 
 products = Blueprint('products', __name__, url_prefix='/products')
 tag_blueprint(products, ["products"])
+
+
+@products.get("/")
+@validate_response(ProductsResponse)
+async def get_product_feed():
+    async with request_services() as services:
+        products_list = await services["get_all_products"].execute()
+
+    return success(
+        {"products": [asdict(ProductSchema.from_entity(product)) for product in products_list]}
+    )
 
 
 @products.post("/")
@@ -45,6 +57,17 @@ async def get_product(tenant_id: str, product_id: str):
         product = await services["get_product"].execute(tenant_id, product_id)
 
     return success({"product": asdict(ProductSchema.from_entity(product))})
+
+
+@products.get("/<tenant_id>")
+@validate_response(ProductsResponse)
+async def get_tenant_products(tenant_id: str):
+    async with request_services() as services:
+        products_list = await services["get_all_products"].execute(tenant_id)
+
+    return success(
+        {"products": [asdict(ProductSchema.from_entity(product)) for product in products_list]}
+    )
 
 
 @products.patch("/<tenant_id>/<product_id>/update")

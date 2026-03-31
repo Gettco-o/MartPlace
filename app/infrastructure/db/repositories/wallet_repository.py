@@ -25,6 +25,22 @@ class SqlAlchemyWalletRepository(WalletRepository):
             return None
         return Wallet(user_id=user_id, entries=entries)
 
+    async def list_all(self) -> list[Wallet]:
+        stmt = (
+            select(LedgerEntryModel)
+            .order_by(
+                LedgerEntryModel.user_id.asc(),
+                LedgerEntryModel.created_at.asc(),
+                LedgerEntryModel.id.asc(),
+            )
+        )
+        result = await self.session.scalars(stmt)
+        wallets: dict[str, list[LedgerEntry]] = {}
+        for model in result.all():
+            entry = ledger_entry_to_entity(model)
+            wallets.setdefault(entry.user_id, []).append(entry)
+        return [Wallet(user_id=user_id, entries=entries) for user_id, entries in wallets.items()]
+
     async def append_entry(self, entry: LedgerEntry) -> None:
         model = await self.session.get(LedgerEntryModel, entry.id)
         model = ledger_entry_to_model(entry, model)

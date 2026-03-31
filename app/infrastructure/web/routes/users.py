@@ -10,6 +10,7 @@ from app.infrastructure.web.schemas import (
     RegisterTenantUserRequest,
     UserSchema,
     UserResponse,
+    UsersResponse,
 )
 from app.infrastructure.web.utils import success
 
@@ -60,3 +61,15 @@ async def get_user(user_id: str):
         user = await services["get_user"].execute(user_id)
 
     return success({"user": asdict(UserSchema.from_entity(user))})
+
+
+@users.get("/")
+@auth_required
+@validate_response(UsersResponse)
+async def get_all_users():
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        users_list = await services["get_all_users"].execute(actor_user_id)
+
+    return success({"users": [asdict(UserSchema.from_entity(user)) for user in users_list]})

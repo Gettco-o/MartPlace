@@ -9,11 +9,23 @@ from app.infrastructure.web.schemas import (
     CreateTenantRequest,
     TenantResponse,
     TenantSchema,
+    TenantsResponse,
 )
 from app.infrastructure.web.utils import success
 
 tenants = Blueprint('tenants', __name__, url_prefix='/tenants')
 tag_blueprint(tenants, ["tenants"])
+
+
+@tenants.get("/active")
+@validate_response(TenantsResponse)
+async def get_active_tenants():
+    async with request_services() as services:
+        tenants_list = await services["get_active_tenants"].execute()
+
+    return success(
+        {"tenants": [asdict(TenantSchema.from_entity(tenant)) for tenant in tenants_list]}
+    )
 
 
 @tenants.post("/")
@@ -30,6 +42,20 @@ async def create_tenant(data: CreateTenantRequest):
         await services["session"].commit()
 
     return success({"tenant": asdict(TenantSchema.from_entity(tenant))}, status_code=201)
+
+
+@tenants.get("/")
+@auth_required
+@validate_response(TenantsResponse)
+async def get_all_tenants():
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        tenants_list = await services["get_all_tenants"].execute(actor_user_id)
+
+    return success(
+        {"tenants": [asdict(TenantSchema.from_entity(tenant)) for tenant in tenants_list]}
+    )
 
 
 @tenants.get("/<tenant_id>")

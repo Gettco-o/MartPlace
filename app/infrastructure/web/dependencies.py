@@ -12,27 +12,34 @@ from app.infrastructure.db.repositories import (
     SqlAlchemyWalletRepository,
 )
 from app.use_cases.cart.add_to_cart import AddToCart
+from app.use_cases.cart.get_all_carts import GetAllCarts
 from app.use_cases.cart.checkout_cart import CheckoutCart
 from app.use_cases.cart.remove_from_cart import RemoveFromCart
 from app.use_cases.order.cancel_order import CancelOrder
 from app.use_cases.order.create_order import CreateOrder
 from app.use_cases.order.deliver_order import DeliverOrder
 from app.use_cases.order.fulfill_order import FulfillOrder
+from app.use_cases.order.get_all_orders import GetAllOrders
 from app.use_cases.order.refund_order import RefundOrder
 from app.use_cases.order.start_order_processing import StartOrderProcessing
 from app.use_cases.product.create_product import CreateProduct
+from app.use_cases.product.get_all_products import GetAllProducts
 from app.use_cases.product.get_product import GetProduct
 from app.use_cases.product.update_product import UpdateProduct
 from app.use_cases.tenant.activate_tenant import ActivateTenant
 from app.use_cases.tenant.create_tenant import CreateTenant
+from app.use_cases.tenant.get_active_tenants import GetActiveTenants
+from app.use_cases.tenant.get_all_tenants import GetAllTenants
 from app.use_cases.tenant.get_tenant import GetTenant
 from app.use_cases.tenant.suspend_tenant import SuspendTenant
 from app.use_cases.user.authenticate_user import AuthenticateUser
+from app.use_cases.user.get_all_users import GetAllUsers
 from app.use_cases.user.get_user import GetUser
 from app.use_cases.user.register_buyer import RegisterBuyer
 from app.use_cases.user.register_tenant_user import RegisterTenantUser
 from app.use_cases.wallet.credit_wallet import CreditWallet
 from app.use_cases.wallet.debit_wallet import DebitWallet
+from app.use_cases.wallet.get_all_wallets import GetAllWallets
 
 
 @asynccontextmanager
@@ -57,6 +64,11 @@ async def request_services():
                 user_repo=user_repo,
             ),
             "get_tenant": GetTenant(tenant_repo=tenant_repo),
+            "get_active_tenants": GetActiveTenants(tenant_repo=tenant_repo),
+            "get_all_tenants": GetAllTenants(
+                tenant_repo=tenant_repo,
+                user_repo=user_repo,
+            ),
             "activate_tenant": ActivateTenant(
                 tenant_repo=tenant_repo,
                 user_repo=user_repo,
@@ -78,6 +90,7 @@ async def request_services():
                 event_bus=event_bus,
             ),
             "get_user": GetUser(user_repo=user_repo),
+            "get_all_users": GetAllUsers(user_repo=user_repo),
             "create_product": CreateProduct(
                 product_repo=product_repo,
                 tenant_repo=tenant_repo,
@@ -85,6 +98,10 @@ async def request_services():
                 event_bus=event_bus,
             ),
             "get_product": GetProduct(product_repo=product_repo),
+            "get_all_products": GetAllProducts(
+                product_repo=product_repo,
+                tenant_repo=tenant_repo,
+            ),
             "update_product": UpdateProduct(
                 cart_repo=cart_repo,
                 product_repo=product_repo,
@@ -99,6 +116,10 @@ async def request_services():
                 user_repo=user_repo,
             ),
             "remove_from_cart": RemoveFromCart(
+                cart_repo=cart_repo,
+                user_repo=user_repo,
+            ),
+            "get_all_carts": GetAllCarts(
                 cart_repo=cart_repo,
                 user_repo=user_repo,
             ),
@@ -128,6 +149,11 @@ async def request_services():
                 tenant_repo=tenant_repo,
                 user_repo=user_repo,
                 event_bus=event_bus,
+            ),
+            "get_all_orders": GetAllOrders(
+                order_repo=order_repo,
+                tenant_repo=tenant_repo,
+                user_repo=user_repo,
             ),
             "start_order_processing": StartOrderProcessing(
                 order_repo=order_repo,
@@ -165,5 +191,9 @@ async def request_services():
                 wallet_repository=wallet_repo,
                 user_repository=user_repo,
                 event_bus=event_bus,
+            ),
+            "get_all_wallets": GetAllWallets(
+                wallet_repository=wallet_repo,
+                user_repository=user_repo,
             ),
         }

@@ -17,6 +17,12 @@ class FakeWalletRepository(WalletRepository):
             entries=list(self.entries[user_id]),
         )
 
+    async def list_all(self) -> list[Wallet]:
+        return [
+            Wallet(user_id=user_id, entries=list(entries))
+            for user_id, entries in self.entries.items()
+        ]
+
     async def append_entry(self, entry: LedgerEntry) -> None:
         self.entries.setdefault(entry.user_id, []).append(entry)
 

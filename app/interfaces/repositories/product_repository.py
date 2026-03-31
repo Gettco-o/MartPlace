@@ -7,6 +7,10 @@ class ProductRepository(ABC):
             pass
 
       @abstractmethod
+      async def list_all(self, tenant_id: str | None = None) -> list[Product]:
+            pass
+
+      @abstractmethod
       async def save(self, product):
             pass
 

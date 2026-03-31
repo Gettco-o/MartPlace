@@ -10,6 +10,10 @@ class WalletRepository(ABC):
         pass
 
     @abstractmethod
+    async def list_all(self) -> list[Wallet]:
+        pass
+
+    @abstractmethod
     async def append_entry(self, entry: LedgerEntry) -> None:
         pass
 

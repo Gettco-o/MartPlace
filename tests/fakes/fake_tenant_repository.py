@@ -16,3 +16,6 @@ class FakeTenantRepository(TenantRepository):
                   if tenant.name == tenant_name:
                         return tenant
             return None
+
+      async def list_all(self) -> list[Tenant]:
+            return list(self.tenants.values())

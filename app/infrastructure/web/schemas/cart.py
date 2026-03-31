@@ -58,3 +58,9 @@ class CartSchema:
 class CartResponse:
     success: bool
     cart: CartSchema
+
+
+@dataclass
+class CartsResponse:
+    success: bool
+    carts: list[CartSchema]

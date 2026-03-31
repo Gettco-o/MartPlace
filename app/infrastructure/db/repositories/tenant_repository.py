@@ -29,3 +29,8 @@ class SqlAlchemyTenantRepository(TenantRepository):
         if model is None:
             return None
         return tenant_to_entity(model)
+
+    async def list_all(self) -> list[Tenant]:
+        stmt = select(TenantModel).order_by(TenantModel.name.asc(), TenantModel.id.asc())
+        result = await self.session.scalars(stmt)
+        return [tenant_to_entity(model) for model in result.all()]

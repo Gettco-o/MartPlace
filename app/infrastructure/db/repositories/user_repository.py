@@ -29,3 +29,8 @@ class SqlAlchemyUserRepository(UserRepository):
         if model is None:
             return None
         return user_to_entity(model)
+
+    async def list_all(self) -> list[User]:
+        stmt = select(UserModel).order_by(UserModel.name.asc(), UserModel.id.asc())
+        result = await self.session.scalars(stmt)
+        return [user_to_entity(model) for model in result.all()]

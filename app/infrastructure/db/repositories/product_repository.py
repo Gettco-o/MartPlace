@@ -27,6 +27,14 @@ class SqlAlchemyProductRepository(ProductRepository):
             return None
         return product_to_entity(model)
 
+    async def list_all(self, tenant_id: str | None = None) -> list[Product]:
+        stmt = select(ProductModel)
+        if tenant_id is not None:
+            stmt = stmt.where(ProductModel.tenant_id == tenant_id)
+        stmt = stmt.order_by(ProductModel.name.asc(), ProductModel.id.asc())
+        result = await self.session.scalars(stmt)
+        return [product_to_entity(model) for model in result.all()]
+
     async def exists_by_name(self, tenant_id: str, name: str) -> bool:
         stmt = select(ProductModel.id).where(
             ProductModel.tenant_id == tenant_id,

@@ -46,3 +46,9 @@ class WalletSchema:
 class WalletResponse:
     success: bool
     wallet: WalletSchema
+
+
+@dataclass
+class WalletsResponse:
+    success: bool
+    wallets: list[WalletSchema]

@@ -10,11 +10,24 @@ from app.infrastructure.web.schemas import (
     WalletAmountRequest,
     WalletResponse,
     WalletSchema,
+    WalletsResponse,
 )
 from app.infrastructure.web.utils import success
 
 wallet = Blueprint('wallet', __name__, url_prefix='/wallet')
 tag_blueprint(wallet, ["wallet"])
+
+
+@wallet.get("/")
+@auth_required
+@validate_response(WalletsResponse)
+async def get_all_wallets():
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        wallets = await services["get_all_wallets"].execute(actor_user_id)
+
+    return success({"wallets": [asdict(WalletSchema.from_entity(wallet_item)) for wallet_item in wallets]})
 
 
 @wallet.post("/credit")

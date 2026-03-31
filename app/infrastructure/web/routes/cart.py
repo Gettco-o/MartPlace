@@ -7,6 +7,7 @@ from app.infrastructure.web.auth import auth_required, get_current_actor_id
 from app.infrastructure.web.dependencies import request_services
 from app.infrastructure.web.schemas import (
     AddToCartRequest,
+    CartsResponse,
     CartResponse,
     CartSchema,
     CheckoutCartRequest,
@@ -18,6 +19,18 @@ from app.infrastructure.web.utils import success
 
 cart = Blueprint('cart', __name__, url_prefix='/cart')
 tag_blueprint(cart, ["cart"])
+
+
+@cart.get("/")
+@auth_required
+@validate_response(CartsResponse)
+async def get_all_carts():
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        carts = await services["get_all_carts"].execute(actor_user_id)
+
+    return success({"carts": [asdict(CartSchema.from_entity(cart_item)) for cart_item in carts]})
 
 
 @cart.post("/items")

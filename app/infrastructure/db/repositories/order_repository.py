@@ -31,3 +31,13 @@ class SqlAlchemyOrderRepository(OrderRepository):
         if model is None:
             return None
         return order_to_entity(model)
+
+    async def list_all(self, tenant_id: str) -> list[Order]:
+        stmt = (
+            select(OrderModel)
+            .options(selectinload(OrderModel.items))
+            .where(OrderModel.tenant_id == tenant_id)
+            .order_by(OrderModel.created_at.desc(), OrderModel.id.desc())
+        )
+        result = await self.session.scalars(stmt)
+        return [order_to_entity(model) for model in result.all()]

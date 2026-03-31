@@ -9,6 +9,15 @@ class FakeProductRepository(ProductRepository):
     async def get_by_id(self, tenant_id: str, product_id: str) -> Product:
         return self.products.get((tenant_id, product_id))
 
+    async def list_all(self, tenant_id: str | None = None) -> list[Product]:
+        if tenant_id is None:
+            return list(self.products.values())
+        return [
+            product
+            for product in self.products.values()
+            if product.tenant_id == tenant_id
+        ]
+
     async def save(self, product: Product):
         key = (product.tenant_id, product.id)
         self.products[key] = product

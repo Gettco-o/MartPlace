@@ -30,3 +30,9 @@ class TenantSchema:
 class TenantResponse:
     success: bool
     tenant: TenantSchema
+
+
+@dataclass
+class TenantsResponse:
+    success: bool
+    tenants: list[TenantSchema]

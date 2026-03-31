@@ -18,6 +18,18 @@ orders = Blueprint('orders', __name__, url_prefix='/orders')
 tag_blueprint(orders, ["orders"])
 
 
+@orders.get("/<tenant_id>")
+@auth_required
+@validate_response(OrdersResponse)
+async def get_all_orders(tenant_id: str):
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        orders_list = await services["get_all_orders"].execute(actor_user_id, tenant_id)
+
+    return success({"orders": [asdict(OrderSchema.from_entity(order)) for order in orders_list]})
+
+
 @orders.post("/")
 @validate_request(CreateOrderRequest)
 @auth_required

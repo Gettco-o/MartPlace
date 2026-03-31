@@ -10,5 +10,12 @@ class FakeOrderRepository(OrderRepository):
     async def get_by_id(self, tenant_id: str, order_id: str) -> Order:
         return self.orders.get((tenant_id, order_id))
 
+    async def list_all(self, tenant_id: str) -> list[Order]:
+        return [
+            order
+            for order in self.orders.values()
+            if order.tenant_id == tenant_id
+        ]
+
     async def save(self, order):
         self.orders[(order.tenant_id, order.id)] = order

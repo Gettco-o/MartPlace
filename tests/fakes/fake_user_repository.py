@@ -18,3 +18,6 @@ class FakeUserRepository(UserRepository):
             if user.email == email:
                 return user
         return None
+
+    async def list_all(self) -> list[User]:
+        return list(self.users.values())

@@ -45,3 +45,9 @@ class UserSchema:
 class UserResponse:
     success: bool
     user: UserSchema
+
+
+@dataclass
+class UsersResponse:
+    success: bool
+    users: list[UserSchema]

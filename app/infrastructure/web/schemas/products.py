@@ -35,6 +35,12 @@ class ProductResponse:
     success: bool
     product: ProductSchema
 
+
+@dataclass
+class ProductsResponse:
+    success: bool
+    products: list[ProductSchema]
+
 @dataclass
 class ProductUpdateRequest:
     name: str | None = None
