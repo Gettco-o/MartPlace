@@ -41,6 +41,8 @@ from app.infrastructure.web.schemas.users import (
     UsersResponse,
 )
 from app.infrastructure.web.schemas.wallet import (
+    TenantWalletResponse,
+    TenantWalletSchema,
     WalletAmountRequest,
     WalletResponse,
     WalletSchema,
@@ -75,6 +77,8 @@ __all__ = [
     "TenantSchema",
     "TenantResponse",
     "TenantsResponse",
+    "TenantWalletResponse",
+    "TenantWalletSchema",
     "UserSchema",
     "UserResponse",
     "UsersResponse",

@@ -3,6 +3,7 @@ from app.domain.entities.idempotency import IdempotencyRecord
 from app.domain.entities.ledger_entry import LedgerEntry
 from app.domain.entities.order import Order
 from app.domain.entities.product import Product
+from app.domain.entities.tenant_ledger_entry import TenantLedgerEntry
 from app.domain.entities.tenant import Tenant
 from app.domain.entities.user import User
 from app.domain.value_objects.cart_item import CartItem
@@ -17,6 +18,7 @@ from app.infrastructure.db.models import (
     OrderModel,
     ProductModel,
     TenantModel,
+    TenantLedgerEntryModel,
     UserModel,
 )
 
@@ -218,6 +220,35 @@ def ledger_entry_to_entity(model: LedgerEntryModel) -> LedgerEntry:
     return LedgerEntry(
         id=model.id,
         user_id=model.user_id,
+        amount=Money(model.amount),
+        entry_type=model.entry_type,
+        reference_id=model.reference_id,
+        created_at=model.created_at,
+    )
+
+
+def tenant_ledger_entry_to_model(
+    entity: TenantLedgerEntry,
+    model: TenantLedgerEntryModel | None = None,
+) -> TenantLedgerEntryModel:
+    model = model or TenantLedgerEntryModel(
+        id=entity.id,
+        tenant_id=entity.tenant_id,
+        amount=entity.amount.amount,
+        entry_type=entity.entry_type,
+        reference_id=entity.reference_id,
+    )
+    model.tenant_id = entity.tenant_id
+    model.amount = entity.amount.amount
+    model.entry_type = entity.entry_type
+    model.reference_id = entity.reference_id
+    return model
+
+
+def tenant_ledger_entry_to_entity(model: TenantLedgerEntryModel) -> TenantLedgerEntry:
+    return TenantLedgerEntry(
+        id=model.id,
+        tenant_id=model.tenant_id,
         amount=Money(model.amount),
         entry_type=model.entry_type,
         reference_id=model.reference_id,

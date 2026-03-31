@@ -7,9 +7,12 @@ from app.interfaces.repositories.idempotency_repository import IdempotencyReposi
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.product_repository import ProductRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
+from app.interfaces.repositories.tenant_wallet_repository import TenantWalletRepository
 from app.interfaces.repositories.user_repository import UserRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
 from app.use_cases.auth import ensure_active_buyer
+from app.domain.entities.tenant_wallet import TenantWallet
+from app.domain.value_objects.order_status import OrderStatus
 
 
 @dataclass
@@ -17,6 +20,7 @@ class RefundOrder:
     order_repo: OrderRepository
     product_repo: ProductRepository
     wallet_repo: WalletRepository
+    tenant_wallet_repo: TenantWalletRepository
     idempotency_repo: IdempotencyRepository
     tenant_repo: TenantRepository
     user_repo: UserRepository
@@ -39,6 +43,7 @@ class RefundOrder:
         if not order:
             raise DomainError("Order not found")
 
+        should_reverse_tenant_wallet = order.status == OrderStatus.DELIVERED
         await ensure_active_buyer(self.user_repo, actor_user_id, order.user_id)
 
         for item in order.items:
@@ -51,6 +56,18 @@ class RefundOrder:
             raise DomainError("Wallet does not exist")
 
         wallet_entry = wallet.credit(order.amount, reference_id=f"refund:{order.id}")
+        if should_reverse_tenant_wallet:
+            tenant_wallet = await self.tenant_wallet_repo.get_wallet(tenant_id)
+            if tenant_wallet is None:
+                tenant_wallet = TenantWallet(tenant_id=tenant_id)
+
+            reversal_reference = f"refund-reversal:{order.id}"
+            if not await self.tenant_wallet_repo.has_reference(tenant_id, reversal_reference):
+                tenant_wallet_entry = tenant_wallet.debit(
+                    order.amount,
+                    reference_id=reversal_reference,
+                )
+                await self.tenant_wallet_repo.append_entry(tenant_wallet_entry)
 
         order.mark_refunded()
 

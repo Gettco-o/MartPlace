@@ -4,14 +4,17 @@ from app.domain.exceptions import DomainError
 from app.interfaces.event_bus import EventBus
 from app.interfaces.repositories.order_repository import OrderRepository
 from app.interfaces.repositories.tenant_repository import TenantRepository
+from app.interfaces.repositories.tenant_wallet_repository import TenantWalletRepository
 from app.interfaces.repositories.user_repository import UserRepository
 from app.use_cases.auth import ensure_tenant_manager
+from app.domain.entities.tenant_wallet import TenantWallet
 
 
 @dataclass
 class DeliverOrder:
     order_repo: OrderRepository
     tenant_repo: TenantRepository
+    tenant_wallet_repo: TenantWalletRepository
     user_repo: UserRepository
     event_bus: EventBus
 
@@ -28,6 +31,15 @@ class DeliverOrder:
             raise DomainError("Order not found")
 
         order.mark_delivered()
+        wallet = await self.tenant_wallet_repo.get_wallet(tenant_id)
+        if wallet is None:
+            wallet = TenantWallet(tenant_id=tenant_id)
+
+        reference_id = f"sale:{order.id}"
+        if not await self.tenant_wallet_repo.has_reference(tenant_id, reference_id):
+            entry = wallet.credit(order.amount, reference_id=reference_id)
+            await self.tenant_wallet_repo.append_entry(entry)
+
         await self.order_repo.save(order)
         self.event_bus.publish(order.events)
         order.clear_events()

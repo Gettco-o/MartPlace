@@ -14,9 +14,13 @@ from tests.fakes.fake_idempotency_repository import FakeIdempotencyRepository
 from tests.fakes.fake_order_repository import FakeOrderRepository
 from tests.fakes.fake_product_repository import FakeProductRepository
 from tests.fakes.fake_tenant_repository import FakeTenantRepository
+from tests.fakes.fake_tenant_wallet_repository import FakeTenantWalletRepository
 from tests.fakes.fake_user_repository import FakeUserRepository
 from tests.fakes.fake_wallet_repository import FakeWalletRepository
-from tests.helpers import make_buyer
+from tests.helpers import make_buyer, make_tenant_user
+from app.use_cases.order.start_order_processing import StartOrderProcessing
+from app.use_cases.order.fulfill_order import FulfillOrder
+from app.use_cases.order.deliver_order import DeliverOrder
 
 run = asyncio.run
 
@@ -28,6 +32,7 @@ def test_refund_order_idempotent():
     order_repo = FakeOrderRepository()
     idem_repo = FakeIdempotencyRepository()
     tenant_repo = FakeTenantRepository()
+    tenant_wallet_repo = FakeTenantWalletRepository()
     user_repo = FakeUserRepository()
 
     # use cases
@@ -46,6 +51,7 @@ def test_refund_order_idempotent():
         order_repo,
         product_repo,
         wallet_repo,
+        tenant_wallet_repo,
         idem_repo,
         tenant_repo,
         user_repo,
@@ -56,7 +62,9 @@ def test_refund_order_idempotent():
 
     tenant = run(create_tenant_use_case.execute(name="Shop A"))
     buyer = make_buyer()
+    tenant_user = make_tenant_user(tenant.id)
     run(user_repo.save(buyer))
+    run(user_repo.save(tenant_user))
 
     # setup product
     product = Product(
@@ -85,6 +93,10 @@ def test_refund_order_idempotent():
             ],
             idempotency_key="order-123"))
 
+    run(StartOrderProcessing(order_repo, tenant_repo, user_repo, fake_bus).execute(tenant_user.id, tenant.id, order.id))
+    run(FulfillOrder(order_repo, tenant_repo, user_repo, fake_bus).execute(tenant_user.id, tenant.id, order.id))
+    run(DeliverOrder(order_repo, tenant_repo, tenant_wallet_repo, user_repo, fake_bus).execute(tenant_user.id, tenant.id, order.id))
+
     # refund (first call)
     refunded_1 = run(refund_order.execute(
         actor_user_id=buyer.id,
@@ -109,6 +121,8 @@ def test_refund_order_idempotent():
 
     wallet = run(wallet_repo.get_wallet(buyer.id))
     assert wallet.balance.amount == 100  # refunded
+    tenant_wallet = run(tenant_wallet_repo.get_wallet(tenant.id))
+    assert tenant_wallet.balance.amount == 0
 
     product = run(product_repo.get_by_id(tenant.id, "prod_1"))
     assert product.stock == 10  # stock restored

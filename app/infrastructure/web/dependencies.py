@@ -8,6 +8,7 @@ from app.infrastructure.db.repositories import (
     SqlAlchemyOrderRepository,
     SqlAlchemyProductRepository,
     SqlAlchemyTenantRepository,
+    SqlAlchemyTenantWalletRepository,
     SqlAlchemyUserRepository,
     SqlAlchemyWalletRepository,
 )
@@ -40,6 +41,7 @@ from app.use_cases.user.register_tenant_user import RegisterTenantUser
 from app.use_cases.wallet.credit_wallet import CreditWallet
 from app.use_cases.wallet.debit_wallet import DebitWallet
 from app.use_cases.wallet.get_all_wallets import GetAllWallets
+from app.use_cases.wallet.get_tenant_wallet import GetTenantWallet
 
 
 @asynccontextmanager
@@ -54,6 +56,7 @@ async def request_services():
         cart_repo = SqlAlchemyCartRepository(session)
         order_repo = SqlAlchemyOrderRepository(session)
         wallet_repo = SqlAlchemyWalletRepository(session)
+        tenant_wallet_repo = SqlAlchemyTenantWalletRepository(session)
         idempotency_repo = SqlAlchemyIdempotencyRepository(session)
 
         yield {
@@ -170,6 +173,7 @@ async def request_services():
             "deliver_order": DeliverOrder(
                 order_repo=order_repo,
                 tenant_repo=tenant_repo,
+                tenant_wallet_repo=tenant_wallet_repo,
                 user_repo=user_repo,
                 event_bus=event_bus,
             ),
@@ -177,6 +181,7 @@ async def request_services():
                 order_repo=order_repo,
                 product_repo=product_repo,
                 wallet_repo=wallet_repo,
+                tenant_wallet_repo=tenant_wallet_repo,
                 idempotency_repo=idempotency_repo,
                 tenant_repo=tenant_repo,
                 user_repo=user_repo,
@@ -194,6 +199,11 @@ async def request_services():
             ),
             "get_all_wallets": GetAllWallets(
                 wallet_repository=wallet_repo,
+                user_repository=user_repo,
+            ),
+            "get_tenant_wallet": GetTenantWallet(
+                tenant_wallet_repository=tenant_wallet_repo,
+                tenant_repository=tenant_repo,
                 user_repository=user_repo,
             ),
         }

@@ -22,6 +22,7 @@ from tests.fakes.fake_idempotency_repository import FakeIdempotencyRepository
 from tests.fakes.fake_order_repository import FakeOrderRepository
 from tests.fakes.fake_product_repository import FakeProductRepository
 from tests.fakes.fake_tenant_repository import FakeTenantRepository
+from tests.fakes.fake_tenant_wallet_repository import FakeTenantWalletRepository
 from tests.fakes.fake_user_repository import FakeUserRepository
 from tests.fakes.fake_wallet_repository import FakeWalletRepository
 from tests.helpers import make_buyer, make_tenant_user
@@ -36,6 +37,7 @@ def test_order_progresses_from_paid_to_processing_to_fulfilled_to_delivered():
     idem_repo = FakeIdempotencyRepository()
     tenant_repo = FakeTenantRepository()
     user_repo = FakeUserRepository()
+    tenant_wallet_repo = FakeTenantWalletRepository()
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
@@ -51,7 +53,7 @@ def test_order_progresses_from_paid_to_processing_to_fulfilled_to_delivered():
     )
     start_processing = StartOrderProcessing(order_repo, tenant_repo, user_repo, fake_bus)
     fulfill_order = FulfillOrder(order_repo, tenant_repo, user_repo, fake_bus)
-    deliver_order = DeliverOrder(order_repo, tenant_repo, user_repo, fake_bus)
+    deliver_order = DeliverOrder(order_repo, tenant_repo, tenant_wallet_repo, user_repo, fake_bus)
 
     tenant = run(create_tenant.execute(name="Shop A"))
     buyer = make_buyer()
@@ -85,6 +87,7 @@ def test_order_progresses_from_paid_to_processing_to_fulfilled_to_delivered():
 
     delivered = run(deliver_order.execute(tenant_user.id, tenant.id, order.id))
     assert delivered.status == OrderStatus.DELIVERED
+    assert run(tenant_wallet_repo.get_wallet(tenant.id)).balance == Money(10000)
     assert any(isinstance(e, OrderProcessingStarted) for e in fake_bus.published_events)
     assert any(isinstance(e, OrderFulfilled) for e in fake_bus.published_events)
     assert any(isinstance(e, OrderDelivered) for e in fake_bus.published_events)
@@ -97,6 +100,7 @@ def test_buyer_can_cancel_paid_order_and_get_wallet_refund_and_stock_back():
     idem_repo = FakeIdempotencyRepository()
     tenant_repo = FakeTenantRepository()
     user_repo = FakeUserRepository()
+    tenant_wallet_repo = FakeTenantWalletRepository()
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
@@ -145,6 +149,7 @@ def test_buyer_can_cancel_paid_order_and_get_wallet_refund_and_stock_back():
 
     assert cancelled.status == OrderStatus.CANCELLED
     assert run(wallet_repo.get_wallet(buyer.id)).balance == Money(15000)
+    assert run(tenant_wallet_repo.get_wallet(tenant.id)) is None
     assert run(product_repo.get_by_id(tenant.id, product.id)).stock == 10
     assert any(isinstance(e, OrderCancelled) for e in fake_bus.published_events)
 
@@ -156,6 +161,7 @@ def test_order_rejects_invalid_lifecycle_transitions():
     idem_repo = FakeIdempotencyRepository()
     tenant_repo = FakeTenantRepository()
     user_repo = FakeUserRepository()
+    tenant_wallet_repo = FakeTenantWalletRepository()
     fake_bus = FakeEventBus()
 
     create_tenant = CreateTenant(tenant_repo, fake_bus)
@@ -171,7 +177,7 @@ def test_order_rejects_invalid_lifecycle_transitions():
     )
     start_processing = StartOrderProcessing(order_repo, tenant_repo, user_repo, fake_bus)
     fulfill_order = FulfillOrder(order_repo, tenant_repo, user_repo, fake_bus)
-    deliver_order = DeliverOrder(order_repo, tenant_repo, user_repo, fake_bus)
+    deliver_order = DeliverOrder(order_repo, tenant_repo, tenant_wallet_repo, user_repo, fake_bus)
     cancel_order = CancelOrder(
         order_repo,
         product_repo,

@@ -7,6 +7,8 @@ from app.domain.value_objects.money import Money
 from app.infrastructure.web.auth import auth_required, get_current_actor_id
 from app.infrastructure.web.dependencies import request_services
 from app.infrastructure.web.schemas import (
+    TenantWalletResponse,
+    TenantWalletSchema,
     WalletAmountRequest,
     WalletResponse,
     WalletSchema,
@@ -16,6 +18,18 @@ from app.infrastructure.web.utils import success
 
 wallet = Blueprint('wallet', __name__, url_prefix='/wallet')
 tag_blueprint(wallet, ["wallet"])
+
+
+@wallet.get("/tenants/<tenant_id>")
+@auth_required
+@validate_response(TenantWalletResponse)
+async def get_tenant_wallet(tenant_id: str):
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        wallet_item = await services["get_tenant_wallet"].execute(actor_user_id, tenant_id)
+
+    return success({"wallet": asdict(TenantWalletSchema.from_entity(wallet_item))})
 
 
 @wallet.get("/")
