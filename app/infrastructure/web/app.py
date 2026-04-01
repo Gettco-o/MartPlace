@@ -5,6 +5,10 @@ from quart import Quart, jsonify
 from quart_schema import tag
 from quart_cors import cors
 from app.domain.exceptions import DomainError
+from app.infrastructure.event_handlers import (
+      register_audit_log_handlers,
+      register_event_file_handlers,
+)
 from app.infrastructure.web.auth import AuthenticationError
 from app.infrastructure.web.extensions import db, event_bus, qs
 
@@ -16,9 +20,12 @@ def create_app():
       app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
       app.config["AUTH_TOKEN_MAX_AGE"] = int(os.getenv("AUTH_TOKEN_MAX_AGE", "900"))
       app.config["AUTH_REFRESH_TOKEN_MAX_AGE"] = int(os.getenv("AUTH_REFRESH_TOKEN_MAX_AGE", "604800"))
+      app.config["EVENT_LOG_PATH"] = os.getenv("EVENT_LOG_PATH", "logs/events.log")
 
       db.init_app(app)
       qs.init_app(app)
+      register_audit_log_handlers(event_bus)
+      register_event_file_handlers(event_bus, app.config["EVENT_LOG_PATH"])
       app.extensions["event_bus"] = event_bus
       app.extensions["auth_refresh_store"] = {}
 
