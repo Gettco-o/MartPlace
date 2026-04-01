@@ -6,6 +6,8 @@ from app.domain.events.order_created import OrderCreated
 from app.infrastructure.event_bus import SimpleEventBus
 from app.infrastructure.event_handlers.audit_logger import register_audit_log_handlers
 from app.infrastructure.event_handlers.file_logger import register_event_file_handlers
+from app.infrastructure.event_handlers.order_emails import register_order_email_handlers
+from app.infrastructure.services.file_email_service import FileEmailService
 
 
 def test_audit_log_handler_is_invoked_for_registered_event(caplog):
@@ -16,6 +18,7 @@ def test_audit_log_handler_is_invoked_for_registered_event(caplog):
         order_id="order-1",
         tenant_id="tenant-1",
         user_id="user-1",
+        user_email="buyer@example.com",
         occurred_at=datetime.now(),
     )
 
@@ -35,6 +38,7 @@ def test_file_log_handler_writes_published_event(tmp_path):
         order_id="order-2",
         tenant_id="tenant-1",
         user_id="user-1",
+        user_email="buyer@example.com",
         occurred_at=datetime.now(),
     )
 
@@ -46,3 +50,28 @@ def test_file_log_handler_writes_published_event(tmp_path):
     payload = json.loads(lines[0])
     assert payload["event_type"] == "OrderCreated"
     assert payload["payload"]["order_id"] == "order-2"
+
+
+def test_order_created_handler_writes_email_to_file(tmp_path):
+    event_bus = SimpleEventBus()
+    email_log_path = tmp_path / "emails.log"
+    email_service = FileEmailService(email_log_path)
+    register_order_email_handlers(event_bus, email_service)
+
+    event = OrderCreated(
+        order_id="order-3",
+        tenant_id="tenant-9",
+        user_id="user-1",
+        user_email="buyer@example.com",
+        occurred_at=datetime.now(),
+    )
+
+    event_bus.publish([event])
+
+    lines = email_log_path.read_text(encoding="utf-8").splitlines()
+    assert len(lines) == 1
+
+    payload = json.loads(lines[0])
+    assert payload["to"] == "buyer@example.com"
+    assert payload["subject"] == "Order order-3 created successfully"
+    assert "tenant-9" in payload["body"]

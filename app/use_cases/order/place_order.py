@@ -35,7 +35,7 @@ class PlaceOrder:
             raise DomainError("Tenant not found")
 
         tenant.ensure_active()
-        await ensure_active_buyer(self.user_repo, actor_user_id, user_id)
+        buyer = await ensure_active_buyer(self.user_repo, actor_user_id, user_id)
 
         total_amount = Money(0)
         product_entities = []
@@ -68,7 +68,7 @@ class PlaceOrder:
             amount=total_amount,
         )
         wallet_entry = wallet.debit(total_amount, reference_id=order.id)
-        order.mark_paid()
+        order.mark_paid(user_email=buyer.email)
 
         for product in product_entities:
             await self.product_repo.save(product)

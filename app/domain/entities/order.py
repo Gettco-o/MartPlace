@@ -39,7 +39,7 @@ class Order(EntityWithEvents):
             return self.status == OrderStatus.PAID
 
       
-      def mark_paid(self):
+      def mark_paid(self, user_email: str):
             if self.status != OrderStatus.CREATED:
                   raise DomainError("Only ceated orders can be marked as PAID")
             self.status = OrderStatus.PAID
@@ -48,6 +48,7 @@ class Order(EntityWithEvents):
                         order_id=self.id,
                         tenant_id=self.tenant_id,
                         user_id=self.user_id,
+                        user_email=user_email,
                         occurred_at=datetime.now(),
                   )
             )
