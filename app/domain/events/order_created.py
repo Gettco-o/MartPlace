@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
+
 from app.domain.events.base import DomainEvent
 
 
@@ -9,3 +10,4 @@ class OrderCreated(DomainEvent):
     tenant_id: str
     user_id: str
     user_email: str
+    tenant_admin_emails: tuple[str, ...] = ()

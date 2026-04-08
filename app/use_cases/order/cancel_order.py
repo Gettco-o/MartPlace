@@ -8,6 +8,7 @@ from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.user_repository import UserRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
 from app.use_cases.auth import ensure_active_buyer
+from app.domain.value_objects.user_role import UserRole
 
 
 @dataclass
@@ -42,7 +43,20 @@ class CancelOrder:
             raise DomainError("Wallet does not exist")
 
         wallet_entry = wallet.credit(order.amount, reference_id=f"cancel:{order.id}")
-        order.mark_cancelled()
+        buyer = await self.user_repo.get_by_id(order.user_id)
+        if not buyer:
+            raise DomainError("Buyer not found")
+
+        tenant_admin_emails = tuple(
+            user.email
+            for user in await self.user_repo.list_by_tenant(tenant_id)
+            if user.role == UserRole.TENANT_ADMIN
+        )
+
+        order.mark_cancelled(
+            user_email=buyer.email,
+            tenant_admin_emails=tenant_admin_emails,
+        )
 
         await self.wallet_repo.append_entry(wallet_entry)
         await self.order_repo.save(order)

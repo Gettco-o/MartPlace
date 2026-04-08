@@ -27,7 +27,11 @@ class StartOrderProcessing:
         if not order:
             raise DomainError("Order not found")
 
-        order.start_processing()
+        buyer = await self.user_repo.get_by_id(order.user_id)
+        if not buyer:
+            raise DomainError("Buyer not found")
+
+        order.start_processing(user_email=buyer.email)
         await self.order_repo.save(order)
         self.event_bus.publish(order.events)
         order.clear_events()

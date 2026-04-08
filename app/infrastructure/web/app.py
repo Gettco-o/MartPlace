@@ -7,8 +7,8 @@ from quart_cors import cors
 from app.domain.exceptions import DomainError
 from app.infrastructure.event_handlers import (
       register_audit_log_handlers,
+      register_email_handlers,
       register_event_file_handlers,
-      register_order_email_handlers,
 )
 from app.infrastructure.services import FileEmailService
 from app.infrastructure.web.auth import AuthenticationError
@@ -30,7 +30,7 @@ def create_app():
       email_service = FileEmailService(app.config["EMAIL_LOG_PATH"])
       register_audit_log_handlers(event_bus)
       register_event_file_handlers(event_bus, app.config["EVENT_LOG_PATH"])
-      register_order_email_handlers(event_bus, email_service)
+      register_email_handlers(event_bus, email_service)
       app.extensions["event_bus"] = event_bus
       app.extensions["email_service"] = email_service
       app.extensions["auth_refresh_store"] = {}

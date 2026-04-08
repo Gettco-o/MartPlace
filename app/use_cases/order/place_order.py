@@ -12,6 +12,7 @@ from app.interfaces.repositories.tenant_repository import TenantRepository
 from app.interfaces.repositories.user_repository import UserRepository
 from app.interfaces.repositories.wallet_repository import WalletRepository
 from app.use_cases.auth import ensure_active_buyer
+from app.domain.value_objects.user_role import UserRole
 
 
 @dataclass
@@ -60,6 +61,12 @@ class PlaceOrder:
         if wallet is None:
             raise DomainError("Wallet does not exist")
 
+        tenant_admin_emails = tuple(
+            user.email
+            for user in await self.user_repo.list_by_tenant(tenant_id)
+            if user.role == UserRole.TENANT_ADMIN
+        )
+
         order = Order(
             id=str(uuid.uuid4()),
             tenant_id=tenant_id,
@@ -68,7 +75,10 @@ class PlaceOrder:
             amount=total_amount,
         )
         wallet_entry = wallet.debit(total_amount, reference_id=order.id)
-        order.mark_paid(user_email=buyer.email)
+        order.mark_paid(
+            user_email=buyer.email,
+            tenant_admin_emails=tenant_admin_emails,
+        )
 
         for product in product_entities:
             await self.product_repo.save(product)

@@ -34,3 +34,12 @@ class SqlAlchemyUserRepository(UserRepository):
         stmt = select(UserModel).order_by(UserModel.name.asc(), UserModel.id.asc())
         result = await self.session.scalars(stmt)
         return [user_to_entity(model) for model in result.all()]
+
+    async def list_by_tenant(self, tenant_id: str) -> list[User]:
+        stmt = (
+            select(UserModel)
+            .where(UserModel.tenant_id == tenant_id)
+            .order_by(UserModel.name.asc(), UserModel.id.asc())
+        )
+        result = await self.session.scalars(stmt)
+        return [user_to_entity(model) for model in result.all()]

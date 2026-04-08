@@ -39,7 +39,7 @@ class Order(EntityWithEvents):
             return self.status == OrderStatus.PAID
 
       
-      def mark_paid(self, user_email: str):
+      def mark_paid(self, user_email: str, tenant_admin_emails: tuple[str, ...] = ()):
             if self.status != OrderStatus.CREATED:
                   raise DomainError("Only ceated orders can be marked as PAID")
             self.status = OrderStatus.PAID
@@ -49,11 +49,12 @@ class Order(EntityWithEvents):
                         tenant_id=self.tenant_id,
                         user_id=self.user_id,
                         user_email=user_email,
+                        tenant_admin_emails=tenant_admin_emails,
                         occurred_at=datetime.now(),
                   )
             )
 
-      def start_processing(self):
+      def start_processing(self, user_email: str):
             if self.status != OrderStatus.PAID:
                   raise DomainError("Only paid orders can be moved to PROCESSING")
             self.status = OrderStatus.PROCESSING
@@ -62,11 +63,12 @@ class Order(EntityWithEvents):
                         order_id=self.id,
                         tenant_id=self.tenant_id,
                         user_id=self.user_id,
+                        user_email=user_email,
                         occurred_at=datetime.now(),
                   )
             )
 
-      def mark_fulfilled(self):
+      def mark_fulfilled(self, user_email: str):
             if self.status != OrderStatus.PROCESSING:
                   raise DomainError("Only processing orders can be marked as FULFILLED")
             self.status = OrderStatus.FULFILLED
@@ -75,11 +77,12 @@ class Order(EntityWithEvents):
                         order_id=self.id,
                         tenant_id=self.tenant_id,
                         user_id=self.user_id,
+                        user_email=user_email,
                         occurred_at=datetime.now(),
                   )
             )
 
-      def mark_delivered(self):
+      def mark_delivered(self, user_email: str, tenant_admin_emails: tuple[str, ...] = ()):
             if self.status != OrderStatus.FULFILLED:
                   raise DomainError("Only fulfilled orders can be marked as DELIVERED")
             self.status = OrderStatus.DELIVERED
@@ -88,11 +91,13 @@ class Order(EntityWithEvents):
                         order_id=self.id,
                         tenant_id=self.tenant_id,
                         user_id=self.user_id,
+                        user_email=user_email,
+                        tenant_admin_emails=tenant_admin_emails,
                         occurred_at=datetime.now(),
                   )
             )
 
-      def mark_cancelled(self):
+      def mark_cancelled(self, user_email: str, tenant_admin_emails: tuple[str, ...] = ()):
             if not self.can_cancel():
                   raise DomainError("Only paid orders can be cancelled")
             self.status = OrderStatus.CANCELLED
@@ -101,11 +106,13 @@ class Order(EntityWithEvents):
                         order_id=self.id,
                         tenant_id=self.tenant_id,
                         user_id=self.user_id,
+                        user_email=user_email,
+                        tenant_admin_emails=tenant_admin_emails,
                         occurred_at=datetime.now(),
                   )
             )
 
-      def mark_refunded(self):
+      def mark_refunded(self, user_email: str, tenant_admin_emails: tuple[str, ...] = ()):
             if not self.can_refund():
                   raise DomainError("Only paid orders can be refunded")
             self.status = OrderStatus.REFUNDED
@@ -114,11 +121,13 @@ class Order(EntityWithEvents):
                         order_id=self.id,
                         tenant_id=self.tenant_id,
                         user_id=self.user_id,
+                        user_email=user_email,
+                        tenant_admin_emails=tenant_admin_emails,
                         occurred_at=datetime.now(),
                   )
             )
 
-      def mark_failed(self):
+      def mark_failed(self, user_email: str):
             if self.status != OrderStatus.CREATED:
                   raise DomainError("Only created orders can be marked as FAILED")
             self.status = OrderStatus.FAILED
@@ -127,6 +136,7 @@ class Order(EntityWithEvents):
                         order_id=self.id,
                         tenant_id=self.tenant_id,
                         user_id=self.user_id,
+                        user_email=user_email,
                         occurred_at=datetime.now(),
                   )
             )

@@ -21,3 +21,6 @@ class FakeUserRepository(UserRepository):
 
     async def list_all(self) -> list[User]:
         return list(self.users.values())
+
+    async def list_by_tenant(self, tenant_id: str) -> list[User]:
+        return [user for user in self.users.values() if user.tenant_id == tenant_id]

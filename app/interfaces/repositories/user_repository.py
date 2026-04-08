@@ -19,3 +19,7 @@ class UserRepository(ABC):
       @abstractmethod
       async def list_all(self) -> list[User]:
             pass
+
+      @abstractmethod
+      async def list_by_tenant(self, tenant_id: str) -> list[User]:
+            pass

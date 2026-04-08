@@ -7,3 +7,4 @@ class OrderFailed(DomainEvent):
     order_id: str
     tenant_id: str
     user_id: str
+    user_email: str
