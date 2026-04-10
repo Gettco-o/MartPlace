@@ -253,6 +253,7 @@ If any field is omitted, the command prompts for it interactively.
 ### Cart
 
 - `GET /cart/`
+- `GET /cart/all`
 - `POST /cart/items`
 - `DELETE /cart/items`
 - `POST /cart/checkout`

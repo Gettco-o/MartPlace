@@ -23,6 +23,21 @@ tag_blueprint(cart, ["cart"])
 
 @cart.get("/")
 @auth_required
+@validate_response(CartResponse)
+async def get_cart():
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        cart_entity = await services["get_cart"].execute(
+            actor_user_id=actor_user_id,
+            user_id=actor_user_id,
+        )
+
+    return success({"cart": asdict(CartSchema.from_entity(cart_entity))})
+
+
+@cart.get("/all")
+@auth_required
 @validate_response(CartsResponse)
 async def get_all_carts():
     actor_user_id = get_current_actor_id()

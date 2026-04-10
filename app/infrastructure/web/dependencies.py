@@ -13,8 +13,9 @@ from app.infrastructure.db.repositories import (
     SqlAlchemyWalletRepository,
 )
 from app.use_cases.cart.add_to_cart import AddToCart
-from app.use_cases.cart.get_all_carts import GetAllCarts
 from app.use_cases.cart.checkout_cart import CheckoutCart
+from app.use_cases.cart.get_all_carts import GetAllCarts
+from app.use_cases.cart.get_cart import GetCart
 from app.use_cases.cart.remove_from_cart import RemoveFromCart
 from app.use_cases.order.cancel_order import CancelOrder
 from app.use_cases.order.create_order import CreateOrder
@@ -116,6 +117,10 @@ async def request_services():
                 cart_repo=cart_repo,
                 product_repo=product_repo,
                 tenant_repo=tenant_repo,
+                user_repo=user_repo,
+            ),
+            "get_cart": GetCart(
+                cart_repo=cart_repo,
                 user_repo=user_repo,
             ),
             "remove_from_cart": RemoveFromCart(

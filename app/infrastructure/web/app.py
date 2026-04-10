@@ -2,7 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from quart import Quart, jsonify
-from quart_schema import tag
+from quart_schema import security_scheme, tag
 from quart_cors import cors
 from app.domain.exceptions import DomainError
 from app.infrastructure.event_handlers import (
@@ -101,6 +101,7 @@ def create_app():
                   }
             )
 
+      @security_scheme([])
       @app.get("/health")
       @tag(["system"])
       async def health():
