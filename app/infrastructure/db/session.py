@@ -1,6 +1,5 @@
 from contextlib import asynccontextmanager
 
-from quart import Quart
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -12,13 +11,13 @@ from app.infrastructure.db.config import DatabaseConfig
 
 
 class Database:
-    """Quart-friendly async SQLAlchemy database manager."""
+    """Async SQLAlchemy database manager."""
 
     def __init__(self) -> None:
         self.engine: AsyncEngine | None = None
         self.session_factory: async_sessionmaker[AsyncSession] | None = None
 
-    def init_app(self, app: Quart, config: DatabaseConfig | None = None) -> None:
+    def init(self, config: DatabaseConfig | None = None) -> DatabaseConfig:
         db_config = config or DatabaseConfig.from_env()
         self.engine = create_async_engine(
             db_config.url,
@@ -31,13 +30,7 @@ class Database:
             expire_on_commit=False,
         )
 
-        app.config["DATABASE_URL"] = db_config.url
-        app.config["SQLALCHEMY_ECHO"] = db_config.echo
-        app.extensions["db"] = self
-
-        @app.after_serving
-        async def shutdown_database() -> None:
-            await self.close()
+        return db_config
 
     @asynccontextmanager
     async def session(self):

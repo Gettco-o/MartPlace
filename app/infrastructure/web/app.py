@@ -5,14 +5,9 @@ from quart import Quart, jsonify
 from quart_schema import security_scheme, tag
 from quart_cors import cors
 from app.domain.exceptions import DomainError
-from app.infrastructure.event_handlers import (
-      register_audit_log_handlers,
-      register_email_handlers,
-      register_event_file_handlers,
-)
-from app.infrastructure.services import FileEmailService
+from app.bootstrap import create_app_runtime
 from app.infrastructure.web.auth import AuthenticationError
-from app.infrastructure.web.extensions import db, event_bus, qs
+from app.infrastructure.web.extensions import db, qs
 
 
 def create_app():
@@ -25,14 +20,22 @@ def create_app():
       app.config["EVENT_LOG_PATH"] = os.getenv("EVENT_LOG_PATH", "logs/events.log")
       app.config["EMAIL_LOG_PATH"] = os.getenv("EMAIL_LOG_PATH", "logs/emails.log")
 
-      db.init_app(app)
+      db_config = db.init()
+      app.config["DATABASE_URL"] = db_config.url
+      app.config["SQLALCHEMY_ECHO"] = db_config.echo
+      app.extensions["db"] = db
+
+      @app.after_serving
+      async def shutdown_database() -> None:
+            await db.close()
+
       qs.init_app(app)
-      email_service = FileEmailService(app.config["EMAIL_LOG_PATH"])
-      register_audit_log_handlers(event_bus)
-      register_event_file_handlers(event_bus, app.config["EVENT_LOG_PATH"])
-      register_email_handlers(event_bus, email_service)
-      app.extensions["event_bus"] = event_bus
-      app.extensions["email_service"] = email_service
+      runtime = create_app_runtime(
+            event_log_path=app.config["EVENT_LOG_PATH"],
+            email_log_path=app.config["EMAIL_LOG_PATH"],
+      )
+      app.extensions["event_bus"] = runtime.event_bus
+      app.extensions["email_service"] = runtime.email_service
       app.extensions["auth_refresh_store"] = {}
 
       @app.errorhandler(DomainError)

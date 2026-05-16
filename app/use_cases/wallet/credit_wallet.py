@@ -29,11 +29,13 @@ class CreditWallet:
                 user_id=user_id,
             )
 
+        user = await self.user_repository.get_by_id(user_id)
+
         reference_id = reference_id or f"wallet-credit:{uuid.uuid4()}"
         if await self.wallet_repository.has_reference(user_id, reference_id):
             return await self.wallet_repository.get_wallet(user_id)
 
-        entry = wallet.credit(amount, reference_id=reference_id)
+        entry = wallet.credit(amount, reference_id=reference_id, user_email=user.email)
         await self.wallet_repository.append_entry(entry)
         self.event_bus.publish(wallet.events)
         wallet.clear_events()

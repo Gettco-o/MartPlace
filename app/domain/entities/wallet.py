@@ -29,7 +29,7 @@ class Wallet(EntityWithEvents):
     def has_reference(self, reference_id: str) -> bool:
         return any(entry.reference_id == reference_id for entry in self.entries)
 
-    def debit(self, amount: Money, reference_id: str) -> LedgerEntry:
+    def debit(self, amount: Money, reference_id: str, user_email: str) -> LedgerEntry:
         if amount <= Money(0):
             raise InvalidAmountError("Amount must be positive")
         if self.balance < amount:
@@ -47,11 +47,12 @@ class Wallet(EntityWithEvents):
                 amount=amount.amount,
                 balance=self.balance.amount,
                 occurred_at=datetime.now(),
+                email=user_email,
             )
         )
         return entry
 
-    def credit(self, amount: Money, reference_id: str) -> LedgerEntry:
+    def credit(self, amount: Money, reference_id: str, user_email: str) -> LedgerEntry:
         if amount <= Money(0):
             raise InvalidAmountError("Amount must be positive")
 
@@ -67,6 +68,7 @@ class Wallet(EntityWithEvents):
                 amount=amount.amount,
                 balance=self.balance.amount,
                 occurred_at=datetime.now(),
+                email=user_email,
             )
         )
         return entry

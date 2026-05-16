@@ -1,51 +1,13 @@
 import argparse
-import asyncio
-from getpass import getpass
+from datetime import datetime
+import os
 import uuid
 
 from dotenv import load_dotenv
-from sqlalchemy import select
 
-from app.domain.entities.user import User
-from app.domain.exceptions import DomainError
-from app.domain.value_objects.user_role import UserRole
-from app.infrastructure.db import Database
-from app.infrastructure.db.models import UserModel
-from app.infrastructure.db.repositories import SqlAlchemyUserRepository
+from app.bootstrap import create_app_runtime
+from app.domain.events.buyer_registered import BuyerRegistered
 from app.infrastructure.web.app import create_app
-from werkzeug.security import generate_password_hash
-
-
-async def bootstrap_platform_admin(email: str, name: str, password: str) -> None:
-    app = create_app()
-    database: Database = app.extensions["db"]
-
-    try:
-        async with database.session() as session:
-            existing_platform_admin = await session.scalar(
-                select(UserModel.id).where(UserModel.role == UserRole.PLATFORM_ADMIN)
-            )
-            if existing_platform_admin is not None:
-                raise DomainError("A platform admin already exists")
-
-            user_repo = SqlAlchemyUserRepository(session)
-            normalized_email = email.strip().lower()
-            if await user_repo.get_by_email(normalized_email):
-                raise DomainError("Email already registered")
-
-            admin_user = User(
-                id=str(uuid.uuid4()),
-                email=normalized_email,
-                name=name.strip(),
-                password=generate_password_hash(password),
-                role=UserRole.PLATFORM_ADMIN,
-            )
-            await user_repo.save(admin_user)
-            await session.commit()
-
-        print(f"Platform admin created for {normalized_email}")
-    finally:
-        await database.close()
 
 
 def parse_args() -> argparse.Namespace:
@@ -55,25 +17,18 @@ def parse_args() -> argparse.Namespace:
     serve_parser = subparsers.add_parser("serve", help="Run the Quart development server")
     serve_parser.add_argument("--debug", action="store_true", help="Run Quart in debug mode")
 
-    bootstrap_parser = subparsers.add_parser(
-        "bootstrap-admin",
-        help="Create the initial platform admin if one does not already exist",
+    emit_parser = subparsers.add_parser(
+        "emit-test-event",
+        help="Publish a test domain event without starting the web server",
     )
-    bootstrap_parser.add_argument("--email", help="Platform admin email")
-    bootstrap_parser.add_argument("--name", help="Platform admin display name")
-    bootstrap_parser.add_argument("--password", help="Platform admin password")
+    emit_parser.add_argument("--email", default="buyer@example.com", help="Buyer email")
+    emit_parser.add_argument("--name", default="Test Buyer", help="Buyer display name")
 
     args = parser.parse_args()
     if args.command is None:
         args.command = "serve"
         args.debug = False
     return args
-
-
-def prompt_if_missing(value: str | None, prompt: str, *, secret: bool = False) -> str:
-    if value:
-        return value
-    return getpass(prompt) if secret else input(prompt)
 
 
 def main() -> None:
@@ -85,11 +40,26 @@ def main() -> None:
         app.run(debug=args.debug)
         return
 
-    if args.command == "bootstrap-admin":
-        email = prompt_if_missing(args.email, "Platform admin email: ")
-        name = prompt_if_missing(args.name, "Platform admin name: ")
-        password = prompt_if_missing(args.password, "Platform admin password: ", secret=True)
-        asyncio.run(bootstrap_platform_admin(email=email, name=name, password=password))
+    if args.command == "emit-test-event":
+        event_log_path = os.getenv("EVENT_LOG_PATH", "logs/events.log")
+        email_log_path = os.getenv("EMAIL_LOG_PATH", "logs/emails.log")
+        runtime = create_app_runtime(
+            event_log_path=event_log_path,
+            email_log_path=email_log_path,
+        )
+        runtime.event_bus.publish(
+            [
+                BuyerRegistered(
+                    user_id=str(uuid.uuid4()),
+                    email=args.email.strip().lower(),
+                    name=args.name.strip(),
+                    occurred_at=datetime.now(),
+                )
+            ]
+        )
+        print(f"Published BuyerRegistered event for {args.email.strip().lower()}")
+        print(f"Event log: {event_log_path}")
+        print(f"Email log: {email_log_path}")
         return
 
     raise SystemExit(f"Unknown command: {args.command}")

@@ -8,3 +8,4 @@ class WalletCredited(DomainEvent):
     user_id: str
     amount: int | float
     balance: int | float
+    email: str
