@@ -1,13 +1,28 @@
+import asyncio
+
 from app.domain.entities.product import Product
 from app.domain.value_objects.money import Money
+from app.domain.value_objects.order_item import OrderItem
 from app.domain.value_objects.order_status import OrderStatus
 from app.use_cases.order.create_order import CreateOrder
 from app.use_cases.order.refund_order import RefundOrder
+from app.use_cases.tenant.create_tenant import CreateTenant
 from app.use_cases.wallet.credit_wallet import CreditWallet
+from tests.fakes.fake_event_bus import FakeEventBus
+from app.domain.events.order_refunded import OrderRefunded
 from tests.fakes.fake_idempotency_repository import FakeIdempotencyRepository
 from tests.fakes.fake_order_repository import FakeOrderRepository
 from tests.fakes.fake_product_repository import FakeProductRepository
+from tests.fakes.fake_tenant_repository import FakeTenantRepository
+from tests.fakes.fake_tenant_wallet_repository import FakeTenantWalletRepository
+from tests.fakes.fake_user_repository import FakeUserRepository
 from tests.fakes.fake_wallet_repository import FakeWalletRepository
+from tests.helpers import make_buyer, make_tenant_user
+from app.use_cases.order.start_order_processing import StartOrderProcessing
+from app.use_cases.order.fulfill_order import FulfillOrder
+from app.use_cases.order.deliver_order import DeliverOrder
+
+run = asyncio.run
 
 
 def test_refund_order_idempotent():
@@ -16,63 +31,98 @@ def test_refund_order_idempotent():
     product_repo = FakeProductRepository()
     order_repo = FakeOrderRepository()
     idem_repo = FakeIdempotencyRepository()
+    tenant_repo = FakeTenantRepository()
+    tenant_wallet_repo = FakeTenantWalletRepository()
+    user_repo = FakeUserRepository()
 
     # use cases
-    credit_wallet = CreditWallet(wallet_repo)
+    fake_bus = FakeEventBus()
+    credit_wallet = CreditWallet(wallet_repo, user_repo, fake_bus)
     create_order = CreateOrder(
         order_repo,
         product_repo,
         wallet_repo,
         idem_repo,
+        tenant_repo,
+        user_repo,
+        fake_bus,
     )
     refund_order = RefundOrder(
         order_repo,
         product_repo,
         wallet_repo,
+        tenant_wallet_repo,
         idem_repo,
+        tenant_repo,
+        user_repo,
+        fake_bus,
     )
+
+    create_tenant_use_case = CreateTenant(tenant_repo=tenant_repo, event_bus=fake_bus)
+
+    tenant = run(create_tenant_use_case.execute(name="Shop A"))
+    buyer = make_buyer()
+    tenant_user = make_tenant_user(tenant.id)
+    run(user_repo.save(buyer))
+    run(user_repo.save(tenant_user))
 
     # setup product
     product = Product(
         id="prod_1",
-        tenant_id="tenant_1",
+        tenant_id=tenant.id,
         name="Nunex",
         price=Money(50),
         stock=10,
     )
-    product_repo.save(product)
+    run(product_repo.save(product))
 
     # setup wallet
-    credit_wallet.execute("tenant_1", "user_1", Money(100))
+    run(credit_wallet.execute(buyer.id, buyer.id, Money(100)))
 
     # create order
-    order = create_order.execute(
-        tenant_id="tenant_1",
-        user_id="user_1",
-        products={"prod_1": 1},
-        idempotency_key="order-123",
-    )
+    order = run(create_order.execute(
+            actor_user_id=buyer.id,
+            tenant_id=tenant.id,
+            user_id=buyer.id,
+            items=[
+                  OrderItem(
+                        product_id="prod_1",
+                        quantity=2,
+                        unit_price=Money(50)
+                  )
+            ],
+            idempotency_key="order-123"))
+
+    run(StartOrderProcessing(order_repo, tenant_repo, user_repo, fake_bus).execute(tenant_user.id, tenant.id, order.id))
+    run(FulfillOrder(order_repo, tenant_repo, user_repo, fake_bus).execute(tenant_user.id, tenant.id, order.id))
+    run(DeliverOrder(order_repo, tenant_repo, tenant_wallet_repo, user_repo, fake_bus).execute(tenant_user.id, tenant.id, order.id))
 
     # refund (first call)
-    refunded_1 = refund_order.execute(
-        tenant_id="tenant_1",
+    refunded_1 = run(refund_order.execute(
+        actor_user_id=buyer.id,
+        tenant_id=tenant.id,
         order_id=order.id,
         idempotency_key="refund-123",
-    )
+    ))
 
     # refund (retry)
-    refunded_2 = refund_order.execute(
-        tenant_id="tenant_1",
+    refunded_2 = run(refund_order.execute(
+        actor_user_id=buyer.id,
+        tenant_id=tenant.id,
         order_id=order.id,
         idempotency_key="refund-123",
-    )
+    ))
 
     # assertions
     assert refunded_1.id == refunded_2.id
     assert refunded_1.status == OrderStatus.REFUNDED
+    # ensure an OrderRefunded event was published
+    assert any(isinstance(e, OrderRefunded) for e in fake_bus.published_events)
 
-    wallet = wallet_repo.get_wallet("tenant_1", "user_1")
+    wallet = run(wallet_repo.get_wallet(buyer.id))
     assert wallet.balance.amount == 100  # refunded
+    tenant_wallet = run(tenant_wallet_repo.get_wallet(tenant.id))
+    assert tenant_wallet.balance.amount == 0
 
-    product = product_repo.get_by_id("tenant_1", "prod_1")
+    product = run(product_repo.get_by_id(tenant.id, "prod_1"))
     assert product.stock == 10  # stock restored

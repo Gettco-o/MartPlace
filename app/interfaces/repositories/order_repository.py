@@ -3,9 +3,13 @@ from app.domain.entities.order import Order
 
 class OrderRepository(ABC):
       @abstractmethod
-      def save(self, order: Order) -> None:
+      async def save(self, order: Order) -> None:
             pass
 
       @abstractmethod
-      def get_by_id(self, tenant_id: str, order_id: str) -> Order | None:
+      async def get_by_id(self, tenant_id: str, order_id: str) -> Order | None:
+            pass
+
+      @abstractmethod
+      async def list_all(self, tenant_id: str) -> list[Order]:
             pass

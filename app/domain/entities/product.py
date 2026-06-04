@@ -1,9 +1,10 @@
 from dataclasses import dataclass
+from app.domain.entities.entity_with_events import EntityWithEvents
 from app.domain.value_objects.money import Money
 from app.domain.exceptions import DomainError
 
 @dataclass
-class Product:
+class Product(EntityWithEvents):
       id: str
       tenant_id: str
       name: str
@@ -14,7 +15,7 @@ class Product:
             if quantity < 0:
                   raise DomainError("Quantity must be positive")
             if self.stock < quantity:
-                  raise DomainError("Insufficent stock")
+                  raise DomainError("Insufficient stock")
             
             self.stock -= quantity
 

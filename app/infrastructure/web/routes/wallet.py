@@ -1,0 +1,82 @@
+from dataclasses import asdict
+
+from quart import Blueprint
+from quart_schema import tag_blueprint, validate_request, validate_response
+
+from app.domain.value_objects.money import Money
+from app.infrastructure.web.auth import auth_required, get_current_actor_id
+from app.infrastructure.web.dependencies import request_services
+from app.infrastructure.web.schemas import (
+    TenantWalletResponse,
+    TenantWalletSchema,
+    WalletAmountRequest,
+    WalletResponse,
+    WalletSchema,
+    WalletsResponse,
+)
+from app.infrastructure.web.utils import success
+
+wallet = Blueprint('wallet', __name__, url_prefix='/wallet')
+tag_blueprint(wallet, ["wallet"])
+
+
+@wallet.get("/tenants/<tenant_id>")
+@auth_required
+@validate_response(TenantWalletResponse)
+async def get_tenant_wallet(tenant_id: str):
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        wallet_item = await services["get_tenant_wallet"].execute(actor_user_id, tenant_id)
+
+    return success({"wallet": asdict(TenantWalletSchema.from_entity(wallet_item))})
+
+
+@wallet.get("/")
+@auth_required
+@validate_response(WalletsResponse)
+async def get_all_wallets():
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        wallets = await services["get_all_wallets"].execute(actor_user_id)
+
+    return success({"wallets": [asdict(WalletSchema.from_entity(wallet_item)) for wallet_item in wallets]})
+
+
+@wallet.post("/credit")
+@validate_request(WalletAmountRequest)
+@auth_required
+@validate_response(WalletResponse, 201)
+async def credit_wallet(data: WalletAmountRequest):
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        wallet_entity = await services["credit_wallet"].execute(
+            actor_user_id=actor_user_id,
+            user_id=actor_user_id,
+            amount=Money(data.amount),
+            reference_id=data.reference_id,
+        )
+        await services["session"].commit()
+
+    return success({"wallet": asdict(WalletSchema.from_entity(wallet_entity))}, status_code=201)
+
+
+@wallet.post("/debit")
+@validate_request(WalletAmountRequest)
+@auth_required
+@validate_response(WalletResponse)
+async def debit_wallet(data: WalletAmountRequest):
+    actor_user_id = get_current_actor_id()
+
+    async with request_services() as services:
+        wallet_entity = await services["debit_wallet"].execute(
+            actor_user_id=actor_user_id,
+            user_id=actor_user_id,
+            amount=Money(data.amount),
+            reference_id=data.reference_id,
+        )
+        await services["session"].commit()
+
+    return success({"wallet": asdict(WalletSchema.from_entity(wallet_entity))})

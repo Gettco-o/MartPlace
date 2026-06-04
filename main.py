@@ -1,68 +1,69 @@
-"""# app/main.py
-from flask import Flask, request, jsonify
-from app.interfaces.repositories.order_repository import OrderRepository
-from app.interfaces.repositories.product_repository import ProductRepository
-from app.interfaces.repositories.wallet_repository import WalletRepository
-from app.use_cases.order.create_order import CreateOrder
+import argparse
+from datetime import datetime
+import os
+import uuid
 
-app = Flask(__name__)
+from dotenv import load_dotenv
 
-# Temporary fake repositories for demonstration purposes
-class FakeProductRepo(ProductRepository):
-      def get_product_by_id(self, tenant_id: str, product_id: str):
-            # Return a fake product
-            from app.domain.entities.product import Product
-            from app.domain.value_objects.money import Money
-            return Product(
-                  id=product_id,
-                  tenant_id=tenant_id,
-                  name="Sample Product",
-                  price=Money(100),
-                  stock=10
-            )
-class FakeWalletRepo(WalletRepository):
-      def get_wallet(self, tenant_id: str, user_id: str):
-            # Return a fake wallet
-            from app.domain.entities.wallet import Wallet
-            from app.domain.value_objects.money import Money
-            return Wallet(
-                  tenant_id=tenant_id,
-                  user_id=user_id,
-                  balance=Money(1000)
-            )
-      def save(self, wallet):
-            pass  # Fake save method
+from app.bootstrap import create_app_runtime
+from app.domain.events.buyer_registered import BuyerRegistered
+from app.infrastructure.web.app import create_app
 
-class FakeOrderRepo(OrderRepository):
-      def save(self, order):
-            pass  # Fake save method
-      def get_order_by_id(self, tenant_id: str, order_id: str):
-            pass  # Fake get method
-            
 
-@app.route("/orders", methods=["POST"])
-def create_order():
-      data = request.json
+def parse_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description="MartPlace management commands")
+    subparsers = parser.add_subparsers(dest="command")
 
-      # temporary fake repositories
-      use_case = CreateOrder(
-            product_repo=FakeProductRepo(),
-            wallet_repo=FakeWalletRepo(),
-            order_repo=FakeOrderRepo(),
-      )
+    serve_parser = subparsers.add_parser("serve", help="Run the Quart development server")
+    serve_parser.add_argument("--debug", action="store_true", help="Run Quart in debug mode")
 
-      order = use_case.execute(
-            tenant_id=data["tenant_id"],
-            user_id=data["user_id"],
-            products=data["products"],
-      )
-      
-      return jsonify({
-        "order_id": order.id,
-        "status": order.status,
-        "total": order.total.amount
-    }), 201
+    emit_parser = subparsers.add_parser(
+        "emit-test-event",
+        help="Publish a test domain event without starting the web server",
+    )
+    emit_parser.add_argument("--email", default="buyer@example.com", help="Buyer email")
+    emit_parser.add_argument("--name", default="Test Buyer", help="Buyer display name")
+
+    args = parser.parse_args()
+    if args.command is None:
+        args.command = "serve"
+        args.debug = False
+    return args
+
+
+def main() -> None:
+    load_dotenv()
+    args = parse_args()
+
+    if args.command == "serve":
+        app = create_app()
+        app.run(debug=args.debug)
+        return
+
+    if args.command == "emit-test-event":
+        event_log_path = os.getenv("EVENT_LOG_PATH", "logs/events.log")
+        email_log_path = os.getenv("EMAIL_LOG_PATH", "logs/emails.log")
+        runtime = create_app_runtime(
+            event_log_path=event_log_path,
+            email_log_path=email_log_path,
+        )
+        runtime.event_bus.publish(
+            [
+                BuyerRegistered(
+                    user_id=str(uuid.uuid4()),
+                    email=args.email.strip().lower(),
+                    name=args.name.strip(),
+                    occurred_at=datetime.now(),
+                )
+            ]
+        )
+        print(f"Published BuyerRegistered event for {args.email.strip().lower()}")
+        print(f"Event log: {event_log_path}")
+        print(f"Email log: {email_log_path}")
+        return
+
+    raise SystemExit(f"Unknown command: {args.command}")
+
 
 if __name__ == "__main__":
-    app.run(debug=True)
-"""
+    main()

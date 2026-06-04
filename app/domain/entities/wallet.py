@@ -1,34 +1,74 @@
-from dataclasses import dataclass
-from app.domain.value_objects.money import Money
+from dataclasses import dataclass, field
+from datetime import datetime
+
+from app.domain.entities.entity_with_events import EntityWithEvents
+from app.domain.entities.ledger_entry import LedgerEntry, LedgerEntryType
+from app.domain.events.wallet_credited import WalletCredited
+from app.domain.events.wallet_debited import WalletDebited
 from app.domain.exceptions import InsufficientFundsError, InvalidAmountError
+from app.domain.value_objects.money import Money
+
 
 @dataclass
-class Wallet:
-      tenant_id: str
-      user_id: str
-      balance: Money
+class Wallet(EntityWithEvents):
+    user_id: str
+    entries: list[LedgerEntry] = field(default_factory=list)
 
-      def debit(self, amount: Money) -> None:
-            if amount <= Money(0):
-                  raise InvalidAmountError("Amount must be positive")
-            if self.balance < amount:
-                  raise InsufficientFundsError("Insufficient funds")
-            self.balance = self.balance.subtract(amount)
+    @property
+    def balance(self) -> Money:
+        running_total = 0
 
-      def credit(self, amount: Money) -> None:
-            if amount <= Money(0):
-                  raise InvalidAmountError("Amount must be positive")
-            self.balance = self.balance.add(amount)
+        for entry in self.entries:
+            if entry.entry_type == LedgerEntryType.CREDIT:
+                running_total += entry.amount.amount
+            else:
+                running_total -= entry.amount.amount
 
-""" 
-@dataclass
-class LedgerEntry:
-      id: str
-      tenant_id: str
-      user_id: str
-      amount: Money
-      entry_type: str  # 'debit' or 'credit'
-      reference_id: str  
-      timestamp: str
+        return Money(running_total)
 
- """
+    def has_reference(self, reference_id: str) -> bool:
+        return any(entry.reference_id == reference_id for entry in self.entries)
+
+    def debit(self, amount: Money, reference_id: str, user_email: str) -> LedgerEntry:
+        if amount <= Money(0):
+            raise InvalidAmountError("Amount must be positive")
+        if self.balance < amount:
+            raise InsufficientFundsError("Insufficient funds")
+
+        entry = LedgerEntry.create_debit(
+            user_id=self.user_id,
+            amount=amount,
+            reference_id=reference_id,
+        )
+        self.entries.append(entry)
+        self.record_event(
+            WalletDebited(
+                user_id=self.user_id,
+                amount=amount.amount,
+                balance=self.balance.amount,
+                occurred_at=datetime.now(),
+                email=user_email,
+            )
+        )
+        return entry
+
+    def credit(self, amount: Money, reference_id: str, user_email: str) -> LedgerEntry:
+        if amount <= Money(0):
+            raise InvalidAmountError("Amount must be positive")
+
+        entry = LedgerEntry.create_credit(
+            user_id=self.user_id,
+            amount=amount,
+            reference_id=reference_id,
+        )
+        self.entries.append(entry)
+        self.record_event(
+            WalletCredited(
+                user_id=self.user_id,
+                amount=amount.amount,
+                balance=self.balance.amount,
+                occurred_at=datetime.now(),
+                email=user_email,
+            )
+        )
+        return entry
