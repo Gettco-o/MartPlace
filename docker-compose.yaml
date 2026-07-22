@@ -1,0 +1,13 @@
+services:
+  martplace:
+    image: teejay/martplace
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: "${UID:-1000}:${GID:-1000}"
+    restart: "always"
+    ports:
+      - "50055:50055"
+    volumes:
+      - ./martplace.db:/martplace/martplace.db
+      - ./logs:/martplace/logs

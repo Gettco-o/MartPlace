@@ -3,13 +3,14 @@ from datetime import datetime
 from pathlib import Path
 
 from app.interfaces.email_service import EmailService
-
+import time
 
 class FileEmailService(EmailService):
     def __init__(self, output_path: str | Path) -> None:
         self.output_path = Path(output_path)
 
     def send(self, to: str, subject: str, body: str) -> None:
+        time.sleep(10)  # Simulate a delay in sending the email to confirm async nature of events
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         payload = {
             "to": to,

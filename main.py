@@ -16,6 +16,17 @@ def parse_args() -> argparse.Namespace:
 
     serve_parser = subparsers.add_parser("serve", help="Run the Quart development server")
     serve_parser.add_argument("--debug", action="store_true", help="Run Quart in debug mode")
+    serve_parser.add_argument(
+        "--host",
+        default=os.getenv("HOST", "0.0.0.0"),
+        help="Host interface to bind the server to",
+    )
+    serve_parser.add_argument(
+        "--port",
+        type=int,
+        default=int(os.getenv("PORT", "50055")),
+        help="Port to bind the server to",
+    )
 
     emit_parser = subparsers.add_parser(
         "emit-test-event",
@@ -28,6 +39,8 @@ def parse_args() -> argparse.Namespace:
     if args.command is None:
         args.command = "serve"
         args.debug = False
+        args.host = os.getenv("HOST", "0.0.0.0")
+        args.port = int(os.getenv("PORT", "50055"))
     return args
 
 
@@ -37,7 +50,7 @@ def main() -> None:
 
     if args.command == "serve":
         app = create_app()
-        app.run(debug=args.debug)
+        app.run(host=args.host, port=args.port, debug=args.debug)
         return
 
     if args.command == "emit-test-event":
