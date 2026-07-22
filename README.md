@@ -1,378 +1,323 @@
 # MartPlace
 
-MartPlace is a multi-tenant marketplace backend built for buyers, tenant vendors, and platform administrators. It provides authentication, tenant onboarding, product and inventory management, cart and checkout flows, wallet-based transactions, a full order lifecycle, and event-driven email notifications.
+MartPlace is a multi-tenant marketplace backend built for buyers, tenant vendors, and platform administrators. It provides authentication, tenant onboarding, product and inventory management, cart and checkout flows, wallet-based transactions, a full order lifecycle, and event-driven logging and notifications.
 
 ## Highlights
 
 - Multi-tenant commerce architecture
-- Buyer, tenant admin, tenant staff, and platform admin roles
-- Product catalog and stock management
-- Cart management and checkout
-- Wallet credit/debit flows for buyers
-- Tenant wallet crediting on completed sales
-- Order lifecycle handling:
-  - create
-  - processing
-  - fulfilled
-  - delivered
-  - cancelled
-  - refunded
-- Event-driven logging and notifications
-- Buyer and tenant-admin email notifications
-- Idempotent order creation and refund flows
+- Role-based access control (Buyer, Tenant Admin, Tenant Staff, Platform Admin)
+- Product catalog & stock management
+- Multi-item shopping cart & atomic checkout
+- Wallet credit/debit flows for buyers & automatic tenant wallet crediting on sales
+- Complete order lifecycle handling:
+  - `create`
+  - `processing`
+  - `fulfilled`
+  - `delivered`
+  - `cancelled`
+  - `refunded`
+- Event-driven audit logging and email notification pipeline
+- Containerized development & production deployment via Docker and Docker Compose
+
+---
 
 ## Tech Stack
 
-- Python
-- Quart
-- Quart Schema
-- SQLAlchemy 2.x
-- Alembic
-- SQLite with `aiosqlite` for local development
-- PostgreSQL-ready via `asyncpg`
+- **Language:** Python 3.11+
+- **Web Framework:** Quart (Async ASGI framework) with `quart-schema` (OpenAPI/Swagger docs) & `quart-cors`
+- **Database & ORM:** SQLAlchemy 2.x (async), SQLite (`aiosqlite`) for local dev, PostgreSQL-ready (`asyncpg`)
+- **Migrations:** Alembic
+- **Containerization:** Docker (Multi-stage build) & Docker Compose
+- **Testing:** Pytest & Pytest-Asyncio
+
+---
 
 ## Core Domain
 
 MartPlace models a marketplace where:
 
-- buyers can register, authenticate, fund wallets, browse products, add items to carts, and place orders
-- tenant admins can create and manage products, process tenant orders, and view tenant wallet balances
-- tenant staff can operate within a tenant under role restrictions
-- platform admins can oversee tenants and platform-wide operations
+- **Buyers** register, authenticate, manage wallets, browse marketplace products, manage cart items, place orders, and receive order status updates.
+- **Tenant Admins** create and manage tenant products, oversee tenant orders through their lifecycle, and monitor tenant wallet balances.
+- **Tenant Staff** operate within a tenant's workspace under role restrictions.
+- **Platform Admins** oversee tenants across the platform (activating, suspending, and monitoring platform activity).
 
-## Features
-
-### Authentication and Access Control
-
-- buyer registration
-- tenant user registration
-- login, refresh token, and logout flows
-- role-aware access checks across use cases
-
-### Tenant Management
-
-- create tenants
-- optionally create the initial tenant admin during tenant creation
-- list active tenants
-- suspend and activate tenants
-
-### Product Management
-
-- create products per tenant
-- update product price and stock
-- list marketplace-wide products
-- list tenant-specific products
-
-### Cart and Checkout
-
-- add items to cart
-- remove items from cart
-- list carts
-- checkout cart into one or more orders
-
-### Orders
-
-- create orders
-- list tenant orders
-- cancel orders
-- move orders to processing
-- fulfill orders
-- deliver orders
-- refund orders
-
-### Wallets
-
-- credit buyer wallet
-- debit buyer wallet
-- list wallets
-- get tenant wallet
-
-### Events and Notifications
-
-- domain events emitted from key business operations
-- audit logging
-- file-based event logging
-- buyer email notifications for order updates
-- tenant-admin email notifications for key order events
-- user onboarding emails for buyers and tenant users
-
-## Current Notification Behavior
-
-MartPlace currently supports email notifications through event handlers.
-
-### Buyer Emails
-
-Buyers receive emails for:
-
-- order created
-- order processing started
-- order fulfilled
-- order delivered
-- order cancelled
-- order refunded
-- order failed
-
-### Tenant Admin Emails
-
-Tenant admins receive emails for:
-
-- new order created
-- order cancelled
-- order refunded
-- order delivered
-
-Email delivery is currently implemented with a file-backed email service for development, which writes messages to `logs/emails.log`.
+---
 
 ## Project Structure
 
 ```text
-app/
-  domain/            # Entities, domain events, value objects, exceptions
-  interfaces/        # Contracts for repositories, email service, event bus
-  use_cases/         # Application business logic
-  infrastructure/
-    db/              # SQLAlchemy models, mappers, repositories, DB config
-    event_handlers/  # Audit, logging, buyer emails, tenant emails, user emails
-    services/        # File email service
-    web/             # Quart app, routes, auth, schemas, dependencies
-migrations/          # Alembic migrations
-tests/               # Unit and integration-style tests
-main.py              # App entrypoint and admin bootstrap command
+MartPlace/
+├── app/
+│   ├── domain/            # Entities, domain events, value objects, domain exceptions
+│   ├── interfaces/        # Contracts for repositories, email services, event bus
+│   ├── use_cases/         # Application business logic & orchestrations
+│   ├── infrastructure/
+│   │   ├── db/            # SQLAlchemy models, repositories, mappers, DB configuration
+│   │   ├── event_handlers/# Event listeners (audit, event logging, email dispatchers)
+│   │   ├── services/      # Service implementations (file-backed email service)
+│   │   └── web/           # Quart app, routes, auth, schemas, error handlers
+│   ├── bootstrap.py       # Application runtime initialization
+│   └── platform_admin.py  # Platform admin setup logic
+├── migrations/            # Alembic database migration scripts
+├── tests/                 # Unit and integration test suite
+├── Dockerfile             # Multi-stage Docker build file
+├── docker-compose.yaml    # Docker Compose service definition
+├── .dockerignore          # Docker build exclusion rules
+├── .env.example           # Environment variables template
+├── alembic.ini            # Alembic configuration file
+├── main.py                # Application entrypoint & CLI manager
+├── requirements.txt       # Python dependencies
+└── README.md              # Project documentation
 ```
 
-## Architecture Notes
+---
 
-The codebase follows a layered architecture:
+## Environment Configuration
 
-- `domain`: pure business rules and events
-- `use_cases`: orchestration of business actions
-- `interfaces`: abstractions for infrastructure dependencies
-- `infrastructure`: database, web, event bus, and email implementations
-
-This keeps business logic decoupled from transport and persistence concerns, and makes event-driven extensions easier to add over time.
-
-## Getting Started
-
-### 1. Clone the Repository
+Copy `.env.example` to create your local `.env` configuration:
 
 ```bash
-git clone <your-repo-url>
-cd MartPlace
+cp .env.example .env
 ```
 
-### 2. Create and Activate a Virtual Environment
+### Supported Environment Variables
+
+| Variable | Default | Description |
+| :--- | :--- | :--- |
+| `QUART_ENV` | `development` | Runtime environment (`development`, `production`) |
+| `QUART_DEBUG` | `true` | Enable or disable Quart debug mode |
+| `HOST` | `0.0.0.0` | Server bind host address |
+| `PORT` | `50055` | Server bind port |
+| `DATABASE_URL` | `sqlite+aiosqlite:///martplace.db` | Async database connection string |
+| `SQLALCHEMY_ECHO` | `false` | Enable SQL query echo logging |
+| `SECRET_KEY` | `change-me` | Secret key used for JWT signing and session security |
+| `AUTH_TOKEN_MAX_AGE` | `900` | Access token expiration in seconds (15 minutes) |
+| `AUTH_REFRESH_TOKEN_MAX_AGE` | `604800` | Refresh token expiration in seconds (7 days) |
+| `EVENT_LOG_PATH` | `logs/events.log` | File path for appended domain event logs |
+| `EMAIL_LOG_PATH` | `logs/emails.log` | File path for emitted email notifications |
+
+---
+
+## Docker Setup & Deployment
+
+MartPlace provides containerization using a multi-stage Docker build (`python:3.11-slim`) and Docker Compose.
+
+### Features of the Docker Setup
+
+- **Multi-stage build:** Separates build dependencies (`build-essential`, `libpq-dev`) from the lean runtime image (`libpq5`, `curl`).
+- **Security hardening:** Runs under a non-root system user (`appuser`).
+- **Automated migrations:** Runs `alembic upgrade head` automatically prior to launching the server.
+- **Built-in health checking:** Periodically checks `http://localhost:50055/health`.
+- **Persistent storage:** Mounts local host paths for `martplace.db` and `logs/` to preserve database states and log files across container restarts.
+
+### 1. Running with Docker Compose (Recommended)
+
+Start the containerized service in detached mode:
+
+```bash
+docker compose up -d
+```
+
+Check running status and health:
+
+```bash
+docker compose ps
+```
+
+View container logs:
+
+```bash
+docker compose logs -f
+```
+
+Stop the service:
+
+```bash
+docker compose down
+```
+
+### 2. Running directly with Docker CLI
+
+Build the image:
+
+```bash
+docker build -t teejay/martplace .
+```
+
+Run the container with volume mounts:
+
+```bash
+docker run -d \
+  --name martplace \
+  -p 50055:50055 \
+  -v $(pwd)/martplace.db:/martplace/martplace.db \
+  -v $(pwd)/logs:/martplace/logs \
+  teejay/martplace
+```
+
+---
+
+## Local Development (Without Docker)
+
+### 1. Prerequisites
+
+- Python 3.11+
+- `pip` and `virtualenv`
+
+### 2. Setup Virtual Environment
 
 ```bash
 python3 -m venv env
 source env/bin/activate
-```
-
-### 3. Install Dependencies
-
-```bash
 pip install -r requirements.txt
 pip install pytest
 ```
 
-### 4. Configure Environment Variables
+### 3. Run Database Migrations
 
-Create a `.env` file from the example:
-
-Example values:
-
-```env
-QUART_ENV=development
-QUART_DEBUG=true
-DATABASE_URL=sqlite+aiosqlite:///marketplace.db
-SQLALCHEMY_ECHO=false
-SECRET_KEY=big-secret
-AUTH_TOKEN_MAX_AGE=600
-AUTH_REFRESH_TOKEN_MAX_AGE=302400
-```
-
-### 5. Run Database Migrations
+Apply database schema migrations using Alembic:
 
 ```bash
 alembic upgrade head
 ```
 
-### 6. Start the API
+### 4. Run the Server
+
+Launch the API server using `main.py`:
 
 ```bash
 python3 main.py serve --debug
 ```
 
-The app also starts with:
+or simply:
 
 ```bash
 python3 main.py
 ```
 
-## Bootstrap the Initial Platform Admin
+The application will be accessible at `http://localhost:50055`.
 
-To create the first platform admin:
+---
+
+## CLI & Management Commands
+
+`main.py` serves as the CLI manager for running the app and executing utility tasks:
+
+### Start API Server (`serve`)
 
 ```bash
-python3 main.py bootstrap-admin --email admin@example.com --name "Platform Admin" --password "strong-password"
+python3 main.py serve [--host HOST] [--port PORT] [--debug]
 ```
 
-If any field is omitted, the command prompts for it interactively.
+- `--host`: Bind address (default: `0.0.0.0` or `$HOST`)
+- `--port`: Listen port (default: `50055` or `$PORT`)
+- `--debug`: Run Quart server in debug mode
 
-## API Overview
+### Test Event Emission (`emit-test-event`)
 
-### Auth
+Test the event bus dispatcher and log writers without running the HTTP server:
 
-- `POST /auth/login`
-- `POST /auth/refresh`
-- `POST /auth/logout`
+```bash
+python3 main.py emit-test-event --email "buyer@example.com" --name "Test Buyer"
+```
 
-### Users
+This publishes a `BuyerRegistered` event to test that domain events are properly handled and logged to `logs/events.log` and `logs/emails.log`.
 
-- `POST /users/buyers`
-- `POST /users/tenant-users`
-- `GET /users/<user_id>`
-- `GET /users/`
+---
 
-### Tenants
+## API Overview & Endpoints
 
-- `GET /tenants/active`
-- `POST /tenants/`
-- `GET /tenants/`
-- `GET /tenants/<tenant_id>`
-- `PATCH /tenants/<tenant_id>/suspend`
-- `PATCH /tenants/<tenant_id>/activate`
+Interactive OpenAPI documentation is available via Quart Schema when running the server:
+- **Swagger UI:** `http://localhost:50055/docs`
+- **OpenAPI Schema:** `http://localhost:50055/openapi.json`
 
-### Products
+### Key Endpoints
 
-- `GET /products/`
-- `POST /products/`
-- `GET /products/<tenant_id>`
-- `GET /products/<tenant_id>/<product_id>`
-- `PATCH /products/<tenant_id>/<product_id>/update`
+#### System & Health
+- `GET /health` - Service health status check
 
-### Cart
+#### Authentication (`/auth`)
+- `POST /auth/login` - Authenticate user & obtain access/refresh tokens
+- `POST /auth/refresh` - Refresh access token
+- `POST /auth/logout` - Invalidate current session
 
-- `GET /cart/`
-- `GET /cart/all`
-- `POST /cart/items`
-- `DELETE /cart/items`
-- `POST /cart/checkout`
+#### User Management (`/users`)
+- `POST /users/buyers` - Register buyer account
+- `POST /users/tenant-users` - Register tenant user account
+- `GET /users/` - List users
+- `GET /users/<user_id>` - Get user details
 
-### Orders
+#### Tenant Management (`/tenants`)
+- `POST /tenants/` - Create tenant (optionally creates initial tenant admin)
+- `GET /tenants/` - List tenants
+- `GET /tenants/active` - List active tenants
+- `GET /tenants/<tenant_id>` - Get tenant details
+- `PATCH /tenants/<tenant_id>/activate` - Activate tenant
+- `PATCH /tenants/<tenant_id>/suspend` - Suspend tenant
 
-- `GET /orders/<tenant_id>`
-- `POST /orders/`
-- `PATCH /orders/<tenant_id>/<order_id>/cancel`
-- `PATCH /orders/<tenant_id>/<order_id>/processing`
-- `PATCH /orders/<tenant_id>/<order_id>/fulfill`
-- `PATCH /orders/<tenant_id>/<order_id>/deliver`
-- `POST /orders/<tenant_id>/<order_id>/refund`
+#### Product Catalog (`/products`)
+- `POST /products/` - Create product under tenant
+- `GET /products/` - List all marketplace products
+- `GET /products/<tenant_id>` - List products for specific tenant
+- `GET /products/<tenant_id>/<product_id>` - Get specific product details
+- `PATCH /products/<tenant_id>/<product_id>/update` - Update product price/stock
 
-### Wallet
+#### Cart & Checkout (`/cart`)
+- `GET /cart/` - View current buyer's cart
+- `POST /cart/items` - Add item to cart
+- `DELETE /cart/items` - Remove item from cart
+- `POST /cart/checkout` - Checkout cart items into tenant orders
 
-- `GET /wallet/`
-- `POST /wallet/credit`
-- `POST /wallet/debit`
-- `GET /wallet/tenants/<tenant_id>`
+#### Order Lifecycle (`/orders`)
+- `POST /orders/` - Create order directly
+- `GET /orders/<tenant_id>` - List orders for a tenant
+- `PATCH /orders/<tenant_id>/<order_id>/processing` - Transition order to processing
+- `PATCH /orders/<tenant_id>/<order_id>/fulfill` - Mark order fulfilled
+- `PATCH /orders/<tenant_id>/<order_id>/deliver` - Mark order delivered
+- `PATCH /orders/<tenant_id>/<order_id>/cancel` - Cancel order
+- `POST /orders/<tenant_id>/<order_id>/refund` - Issue order refund
 
-### Health
+#### Wallet Operations (`/wallet`)
+- `GET /wallet/` - Get buyer wallet details
+- `POST /wallet/credit` - Credit buyer wallet balance
+- `POST /wallet/debit` - Debit buyer wallet balance
+- `GET /wallet/tenants/<tenant_id>` - Get tenant wallet balance
 
-- `GET /health`
+---
 
-## Event-Driven Design
+## Event-Driven Architecture & Logging
 
-MartPlace uses a simple in-memory event bus to react to domain events after business actions complete.
+MartPlace utilizes an asynchronous, in-memory event bus powered by a background `ThreadPoolExecutor` (via Blinker signals) to process domain events non-blockingly after business operations complete:
 
-Current event-driven integrations include:
+1. **Domain Events:** `BuyerRegistered`, `OrderCreated`, `OrderFulfilled`, `OrderDelivered`, `OrderCancelled`, `OrderRefunded`, etc.
+2. **Asynchronous Execution:** Event handlers run in background worker threads without blocking request execution times.
+3. **Audit Logging:** Domain events are formatted and appended asynchronously to `logs/events.log`.
+4. **Email Dispatcher:** Triggered event listeners construct notifications asynchronously recorded in `logs/emails.log`.
 
-- audit logging
-- file-based event logging
-- buyer order emails
-- tenant-admin order emails
-- user onboarding emails
-
-This design makes it straightforward to add more listeners for features like notifications, analytics, or background processing.
-
-## Logs and Generated Files
-
-- event log: `logs/events.log`
-- email log: `logs/emails.log`
-- local SQLite database: `martplace.db`
+---
 
 ## Testing
 
-Run tests with:
+Execute the test suite using `pytest`:
 
 ```bash
 pytest
 ```
 
-Or:
+or:
 
 ```bash
 python3 -m pytest
 ```
 
-The repository already includes tests for:
+---
 
-- user registration and authentication
-- tenant creation and management
-- product creation and updates
-- cart behavior
-- wallet operations
-- order lifecycle and refunds
-- event bus handlers
+## Future Roadmap
 
-## Limitations Today
+- [ ] Connect file email service to SMTP / external provider (SendGrid, SES)
+- [ ] Transition from in-memory `ThreadPoolExecutor` events to a distributed message queue / broker (RabbitMQ / Redis / Celery) for multi-process scalability
+- [ ] Add persistent in-app notifications & activity feed for tenant users
+- [ ] Add advanced search, filtering, and pagination across order & product endpoints
+- [ ] Add analytics dashboard endpoints for platform and tenant metrics
 
-- email delivery is file-based, not connected to a real provider
-- the event bus is synchronous and in-memory
-- notifications are email-only; there is no in-app notification center yet
-- background jobs and message queue processing are not yet implemented
-- observability is still lightweight
 
-## TODO
-
-### Product and Platform Improvements
-
-- add persistent in-app notifications for tenant users
-- add notification endpoints for listing, marking as read, and unread counts
-- add a tenant activity feed for operational visibility
-- add richer order filtering, search, and pagination
-- add analytics dashboards for tenants and platform admins
-- add inventory alerts such as low-stock warnings
-
-### Infrastructure Improvements
-
-- replace the file email service with a real email provider
-- move from synchronous in-memory events to asynchronous event processing
-- introduce a queue or broker for event delivery
-- add retry and dead-letter handling for failed event processing
-- improve structured logging and monitoring
-- add error tracking and production-grade observability
-
-### Security and Auth Improvements
-
-- strengthen token/session management
-- add password reset and email verification flows
-- add finer-grained tenant permissions beyond current roles
-
-### API and DX Improvements
-
-- add OpenAPI/Swagger publishing guidance
-- add seed scripts for demo data
-- add containerization with Docker
-- add CI for linting, tests, and migrations
-- add deployment documentation
-
-## Why MartPlace
-
-MartPlace is a strong foundation for building marketplace systems because it already combines:
-
-- multi-tenant boundaries
-- transactional commerce flows
-- role-aware access control
-- extensible event-driven behavior
-- clean separation between domain logic and infrastructure
-
-It is a solid base for evolving from a local development backend into a more production-ready marketplace platform.
