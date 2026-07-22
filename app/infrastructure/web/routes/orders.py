@@ -45,6 +45,7 @@ async def create_order(data: CreateOrderRequest):
             items=[item.to_value_object() for item in data.items],
             idempotency_key=data.idempotency_key,
         )
+        print(order.idempotency_key, "this")
         await services["session"].commit()
 
     return success({"order": asdict(OrderSchema.from_entity(order))}, status_code=201)
