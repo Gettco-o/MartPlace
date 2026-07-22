@@ -8,6 +8,22 @@ services:
     restart: "always"
     ports:
       - "50055:50055"
+    environment:
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      redis:
+        condition: service_healthy
     volumes:
       - ./martplace.db:/martplace/martplace.db
       - ./logs:/martplace/logs
+
+  redis:
+      image: redis:7-alpine
+      restart: "always"
+      # ports:
+      #   - "6379:6379"
+      healthcheck:
+        test: ["CMD", "redis-cli", "ping"]
+        interval: 5s
+        timeout: 3s
+        retries: 5

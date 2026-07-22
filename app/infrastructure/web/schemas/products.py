@@ -5,7 +5,6 @@ from app.domain.entities.product import Product
 
 @dataclass
 class CreateProductRequest:
-    tenant_id: str
     name: str
     price_amount: int
     stock: int

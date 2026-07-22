@@ -6,6 +6,7 @@ from quart_schema import security_scheme, tag
 from quart_cors import cors
 from app.domain.exceptions import DomainError
 from app.bootstrap import create_app_runtime
+from app.infrastructure.services.cache_service import RedisCacheService
 from app.infrastructure.web.auth import AuthenticationError
 from app.infrastructure.web.extensions import db, qs
 
@@ -19,15 +20,25 @@ def create_app():
       app.config["AUTH_REFRESH_TOKEN_MAX_AGE"] = int(os.getenv("AUTH_REFRESH_TOKEN_MAX_AGE", "604800"))
       app.config["EVENT_LOG_PATH"] = os.getenv("EVENT_LOG_PATH", "logs/events.log")
       app.config["EMAIL_LOG_PATH"] = os.getenv("EMAIL_LOG_PATH", "logs/emails.log")
+      app.config["REDIS_URL"] = os.getenv("REDIS_URL", "redis://localhost:6379/0")
 
       db_config = db.init()
       app.config["DATABASE_URL"] = db_config.url
       app.config["SQLALCHEMY_ECHO"] = db_config.echo
       app.extensions["db"] = db
 
+      cache = RedisCacheService(redis_url=app.config["REDIS_URL"])
+      app.extensions["cache"] = cache
+
+      @app.before_serving
+      async def startup_services() -> None:
+            await cache.connect()
+
       @app.after_serving
-      async def shutdown_database() -> None:
+      async def shutdown_services() -> None:
             await db.close()
+            await cache.close()
+
 
       qs.init_app(app)
       runtime = create_app_runtime(
@@ -113,8 +124,10 @@ def create_app():
                         "success": True,
                         "service": "martplace-api",
                         "database_url": app.config.get("DATABASE_URL"),
+                        "redis_connected": cache.is_connected,
                   }
             )
+
 
       from app.infrastructure.web.routes.auth import auth
       from app.infrastructure.web.routes.orders import orders
