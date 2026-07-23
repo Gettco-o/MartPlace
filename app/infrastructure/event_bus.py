@@ -7,6 +7,8 @@ from blinker import NamedSignal, Signal, signal
 
 from concurrent.futures import ThreadPoolExecutor
 
+import asyncio
+
 #simple event bus implementation
 """ 
 class ISimpleEventBus(EventBus):
@@ -83,36 +85,3 @@ class SimpleEventBus(EventBus):
                 "Error while handling event %s",
                 type(event).__name__,
             ) 
-
-# TODO: async event bus implementation using asyncio and async signals
-"""
-class AsyncEventBus(EventBus):
-    def __init__(self):
-        self._emitter: dict[type, Signal] = {}
-        self._logger = logging.getLogger(__name__)
-
-    def register(self, event_type: type, handler: Callable[[Any], None]):
-        emitter_obj = self._emitter.get(event_type)
-        if emitter_obj is None:
-            emitter_obj = Signal(event_type.__name__)
-            self._emitter[event_type] = emitter_obj
-        emitter_obj.connect(handler, weak=False)
-        
-        
-    async def publish(self, events: Iterable[Any]):
-        for event in events:
-            event_type = type(event)
-            emitter_obj = self._emitter.get(event_type)
-            if emitter_obj:
-                await self._safe_send(emitter_obj, event)
-
-    async def _safe_send(self, emitter_obj: Signal, event):
-        try:
-            emitter_obj.send(event)
-        except Exception:
-            self._logger.exception(
-                "Error while handling event %s",
-                type(event).__name__,
-            )
-
-"""
