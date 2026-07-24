@@ -55,6 +55,7 @@ class SimpleEventBus(EventBus):
                 self._logger.exception("Error while handling event %s", type(event))
 """
 # event bus with threadpool
+"""
 class SimpleEventBus(EventBus):
     def __init__(self):
         self._emitter: dict[type, Signal] = {}
@@ -85,3 +86,45 @@ class SimpleEventBus(EventBus):
                 "Error while handling event %s",
                 type(event).__name__,
             ) 
+"""
+
+# events with threadpool and dedicated workers for handlers (not just events)
+# so each handler is dedicated to a worker and can run concurrently with other handlers within same event type
+class SimpleEventBus(EventBus):
+    def __init__(self):
+        self._emitter: dict[type, Signal] = {}
+        self._logger = logging.getLogger(__name__)
+        self._executor = ThreadPoolExecutor(max_workers=10)
+
+    def register(self, event_type: type, handler):
+        emitter_obj = self._emitter.get(event_type)
+
+        if emitter_obj is None:
+            emitter_obj = Signal(event_type.__name__)
+            self._emitter[event_type] = emitter_obj
+
+        emitter_obj.connect(handler, weak=False)
+
+
+    def publish(self, events):
+        for event in events:
+            event_type = type(event)
+            emitter_obj = self._emitter.get(event_type)
+
+            if emitter_obj:
+                for receiver in emitter_obj.receivers_for(event):
+                    self._executor.submit(
+                        self._safe_handle,
+                        receiver,
+                        event
+                    )
+
+
+    def _safe_handle(self, handler, event):
+        try:
+            handler(event)
+        except Exception:
+            self._logger.exception(
+                "Error handling event %s",
+                type(event).__name__
+            )
