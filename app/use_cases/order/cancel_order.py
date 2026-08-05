@@ -42,10 +42,14 @@ class CancelOrder:
         if wallet is None:
             raise DomainError("Wallet does not exist")
 
-        wallet_entry = wallet.credit(order.amount, reference_id=f"cancel:{order.id}")
         buyer = await self.user_repo.get_by_id(order.user_id)
         if not buyer:
             raise DomainError("Buyer not found")
+        wallet_entry = wallet.credit(
+            order.amount,
+            reference_id=f"cancel:{order.id}",
+            user_email=buyer.email,
+        )
 
         tenant_admin_emails = tuple(
             user.email

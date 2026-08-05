@@ -22,8 +22,16 @@ def _serializer() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(secret_key=secret_key, salt="martplace-auth")
 
 
-def _refresh_store() -> dict[str, str]:
-    return current_app.extensions.setdefault("auth_refresh_store", {})
+def _refresh_cache():
+    cache = current_app.extensions.get("cache")
+    if cache is None or not cache.is_connected:
+        # Never issue a refresh token that cannot be revoked or rotated.
+        raise RuntimeError("Redis is unavailable; refresh-token sessions are disabled")
+    return cache
+
+
+def _refresh_session_key(refresh_id: str) -> str:
+    return f"auth:refresh:{refresh_id}"
 
 
 def _issue_token(user_id: str, token_type: str, refresh_id: str | None = None) -> str:
@@ -49,12 +57,18 @@ def _decode_token(token: str, expected_type: str, max_age: int) -> dict:
     return payload
 
 
-def issue_auth_tokens(user_id: str) -> dict[str, str]:
+async def issue_auth_tokens(user_id: str) -> dict[str, str]:
     refresh_id = str(uuid.uuid4())
-    _refresh_store()[user_id] = refresh_id
+    refresh_token = _issue_token(user_id, "refresh", refresh_id=refresh_id)
+    ttl = current_app.config.get("AUTH_REFRESH_TOKEN_MAX_AGE")
+    stored = await _refresh_cache().set_json(
+        _refresh_session_key(refresh_id), {"user_id": user_id}, ttl=ttl
+    )
+    if not stored:
+        raise RuntimeError("Could not persist refresh-token session")
     return {
         "access_token": _issue_token(user_id, "access"),
-        "refresh_token": _issue_token(user_id, "refresh", refresh_id=refresh_id),
+        "refresh_token": refresh_token,
     }
 
 
@@ -64,26 +78,35 @@ def decode_access_token(token: str) -> str:
     return payload["sub"]
 
 
-def refresh_auth_tokens(refresh_token: str) -> dict[str, str]:
+async def refresh_auth_tokens(refresh_token: str) -> dict[str, str]:
     max_age = current_app.config.get("AUTH_REFRESH_TOKEN_MAX_AGE", 604800)
     payload = _decode_token(refresh_token, expected_type="refresh", max_age=max_age)
 
     user_id = payload["sub"]
     refresh_id = payload.get("rid")
-    if not refresh_id or _refresh_store().get(user_id) != refresh_id:
+    if not refresh_id:
         raise AuthenticationError("Refresh token has been revoked")
 
-    return issue_auth_tokens(user_id)
+    session = await _refresh_cache().pop_json(_refresh_session_key(refresh_id))
+    if not session or session.get("user_id") != user_id:
+        raise AuthenticationError("Refresh token has been revoked")
+
+    return await issue_auth_tokens(user_id)
 
 
-def revoke_refresh_token(refresh_token: str) -> None:
+async def revoke_refresh_token(refresh_token: str) -> None:
     max_age = current_app.config.get("AUTH_REFRESH_TOKEN_MAX_AGE", 604800)
     payload = _decode_token(refresh_token, expected_type="refresh", max_age=max_age)
 
     user_id = payload["sub"]
     refresh_id = payload.get("rid")
-    if _refresh_store().get(user_id) == refresh_id:
-        del _refresh_store()[user_id]
+    if not refresh_id:
+        return
+
+    cache = _refresh_cache()
+    session = await cache.get_json(_refresh_session_key(refresh_id))
+    if session and session.get("user_id") == user_id:
+        await cache.delete(_refresh_session_key(refresh_id))
 
 
 def get_current_actor_id() -> str:

@@ -14,10 +14,21 @@ from app.infrastructure.web.extensions import db, qs
 def create_app():
       load_dotenv()
       app = Quart(__name__)
-      app = cors(app)
+      app = cors(app, allow_origin="*")
       app.config["SECRET_KEY"] = os.getenv("SECRET_KEY", "dev-secret-key")
       app.config["AUTH_TOKEN_MAX_AGE"] = int(os.getenv("AUTH_TOKEN_MAX_AGE", "900"))
-      app.config["AUTH_REFRESH_TOKEN_MAX_AGE"] = int(os.getenv("AUTH_REFRESH_TOKEN_MAX_AGE", "604800"))
+      app.config["AUTH_REFRESH_TOKEN_MAX_AGE"] = int(
+            os.getenv("AUTH_REFRESH_TOKEN_MAX_AGE", "604800")
+      )
+      app.config["AUTH_REFRESH_COOKIE_NAME"] = os.getenv(
+            "AUTH_REFRESH_COOKIE_NAME", "refresh_token"
+      )
+      app.config["AUTH_REFRESH_COOKIE_SECURE"] = os.getenv(
+            "AUTH_REFRESH_COOKIE_SECURE", "true"
+      ).lower() == "true"
+      app.config["AUTH_REFRESH_COOKIE_SAMESITE"] = os.getenv(
+            "AUTH_REFRESH_COOKIE_SAMESITE", "Lax"
+      )
       app.config["EVENT_LOG_PATH"] = os.getenv("EVENT_LOG_PATH", "logs/events.log")
       app.config["EMAIL_LOG_PATH"] = os.getenv("EMAIL_LOG_PATH", "logs/emails.log")
       app.config["REDIS_URL"] = os.getenv("REDIS_URL", "redis://localhost:6379/0")
@@ -47,7 +58,6 @@ def create_app():
       )
       app.extensions["event_bus"] = runtime.event_bus
       app.extensions["email_service"] = runtime.email_service
-      app.extensions["auth_refresh_store"] = {}
 
       @app.errorhandler(DomainError)
       async def handle_domain_error(error: DomainError):

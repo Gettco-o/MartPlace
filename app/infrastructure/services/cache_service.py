@@ -77,6 +77,17 @@ class RedisCacheService:
             logger.warning(f"Redis delete failed for key '{key}': {exc}")
             return False
 
+    async def pop_json(self, key: str) -> Optional[Any]:
+        if not self.is_connected:
+            return None
+        try:
+            raw_data = await self._client.execute_command("GETDEL", key)
+            if raw_data:
+                return json.loads(raw_data)
+        except Exception as exc:
+            logger.warning(f"Redis pop_json failed for key '{key}': {exc}")
+        return None
+
     async def delete_pattern(self, pattern: str) -> bool:
         if not self.is_connected:
             return False

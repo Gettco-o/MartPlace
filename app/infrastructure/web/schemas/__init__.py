@@ -2,7 +2,6 @@ from app.infrastructure.web.schemas.auth import (
     AuthTokens,
     LoginRequest,
     LogoutResponse,
-    RefreshTokenRequest,
     RefreshTokensResponse,
 )
 from app.infrastructure.web.schemas.cart import (
@@ -68,7 +67,6 @@ __all__ = [
     "ProductResponse",
     "ProductsResponse",
     "ProductUpdateRequest",
-    "RefreshTokenRequest",
     "RefreshTokensResponse",
     "RefundOrderRequest",
     "RegisterBuyerRequest",
