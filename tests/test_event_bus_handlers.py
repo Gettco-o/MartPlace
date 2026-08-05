@@ -29,6 +29,7 @@ def test_audit_log_handler_is_invoked_for_registered_event(caplog):
 
     with caplog.at_level(logging.INFO, logger="martplace.audit"):
         event_bus.publish([event])
+        event_bus.drain()
 
     assert "domain_event=OrderCreated" in caplog.text
     assert "order-1" in caplog.text
@@ -48,6 +49,7 @@ def test_file_log_handler_writes_published_event(tmp_path):
     )
 
     event_bus.publish([event])
+    event_bus.drain()
 
     lines = log_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
@@ -72,6 +74,7 @@ def test_order_created_handler_writes_email_to_file(tmp_path):
     )
 
     event_bus.publish([event])
+    event_bus.drain()
 
     lines = email_log_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 1
@@ -98,6 +101,7 @@ def test_tenant_order_created_handler_writes_email_to_file(tmp_path):
     )
 
     event_bus.publish([event])
+    event_bus.drain()
 
     lines = email_log_path.read_text(encoding="utf-8").splitlines()
     assert len(lines) == 3
@@ -122,6 +126,7 @@ def test_buyer_registered_handler_writes_email_to_file(tmp_path):
     )
 
     event_bus.publish([event])
+    event_bus.drain()
 
     lines = email_log_path.read_text(encoding="utf-8").splitlines()
     payload = json.loads(lines[0])
@@ -145,6 +150,7 @@ def test_tenant_user_registered_handler_writes_email_to_file(tmp_path):
     )
 
     event_bus.publish([event])
+    event_bus.drain()
 
     lines = email_log_path.read_text(encoding="utf-8").splitlines()
     payload = json.loads(lines[0])
@@ -168,6 +174,7 @@ def test_order_status_handler_writes_email_to_file(tmp_path):
     )
 
     event_bus.publish([event])
+    event_bus.drain()
 
     lines = email_log_path.read_text(encoding="utf-8").splitlines()
     payload = json.loads(lines[0])
@@ -192,6 +199,7 @@ def test_tenant_order_cancelled_handler_writes_email_to_file(tmp_path):
     )
 
     event_bus.publish([event])
+    event_bus.drain()
 
     lines = email_log_path.read_text(encoding="utf-8").splitlines()
     payloads = [json.loads(line) for line in lines]
@@ -215,6 +223,7 @@ def test_tenant_order_refunded_handler_writes_email_to_file(tmp_path):
     )
 
     event_bus.publish([event])
+    event_bus.drain()
 
     lines = email_log_path.read_text(encoding="utf-8").splitlines()
     payloads = [json.loads(line) for line in lines]

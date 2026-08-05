@@ -18,6 +18,36 @@ from tests.helpers import make_buyer
 run = asyncio.run
 
 
+class FakeRefreshCache:
+    is_connected = True
+
+    def __init__(self):
+        self.values = {}
+
+    async def set_json(self, key, value, ttl):
+        self.values[key] = value
+        return True
+
+    async def get_json(self, key):
+        return self.values.get(key)
+
+    async def pop_json(self, key):
+        return self.values.pop(key, None)
+
+    async def delete(self, key):
+        self.values.pop(key, None)
+        return True
+
+
+def auth_test_app():
+    app = Quart(__name__)
+    app.config["SECRET_KEY"] = "test-secret"
+    app.config["AUTH_TOKEN_MAX_AGE"] = 60
+    app.config["AUTH_REFRESH_TOKEN_MAX_AGE"] = 120
+    app.extensions["cache"] = FakeRefreshCache()
+    return app
+
+
 def test_authenticate_user_returns_active_user_for_valid_credentials():
     user_repo = FakeUserRepository()
     user = make_buyer()
@@ -50,40 +80,32 @@ def test_authenticate_user_rejects_invalid_credentials():
 
 
 def test_access_token_round_trip_uses_signed_user_id():
-    app = Quart(__name__)
-    app.config["SECRET_KEY"] = "test-secret"
-    app.config["AUTH_TOKEN_MAX_AGE"] = 60
-    app.config["AUTH_REFRESH_TOKEN_MAX_AGE"] = 120
-    app.extensions["auth_refresh_store"] = {}
+    app = auth_test_app()
 
     async def run_test():
         async with app.app_context():
-            tokens = issue_auth_tokens("user-123")
+            tokens = await issue_auth_tokens("user-123")
             assert decode_access_token(tokens["access_token"]) == "user-123"
 
     run(run_test())
 
 
 def test_refresh_token_rotation_and_logout_revocation():
-    app = Quart(__name__)
-    app.config["SECRET_KEY"] = "test-secret"
-    app.config["AUTH_TOKEN_MAX_AGE"] = 60
-    app.config["AUTH_REFRESH_TOKEN_MAX_AGE"] = 120
-    app.extensions["auth_refresh_store"] = {}
+    app = auth_test_app()
 
     async def run_test():
         async with app.app_context():
-            first_tokens = issue_auth_tokens("user-123")
-            second_tokens = refresh_auth_tokens(first_tokens["refresh_token"])
+            first_tokens = await issue_auth_tokens("user-123")
+            second_tokens = await refresh_auth_tokens(first_tokens["refresh_token"])
 
             assert second_tokens["refresh_token"] != first_tokens["refresh_token"]
 
             with pytest.raises(Exception):
-                refresh_auth_tokens(first_tokens["refresh_token"])
+                await refresh_auth_tokens(first_tokens["refresh_token"])
 
-            revoke_refresh_token(second_tokens["refresh_token"])
+            await revoke_refresh_token(second_tokens["refresh_token"])
 
             with pytest.raises(Exception):
-                refresh_auth_tokens(second_tokens["refresh_token"])
+                await refresh_auth_tokens(second_tokens["refresh_token"])
 
     run(run_test())

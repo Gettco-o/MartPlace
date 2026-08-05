@@ -1,16 +1,17 @@
 from dataclasses import asdict
 
-from quart import Blueprint
-from quart_schema import security_scheme, security_scheme_blueprint, tag_blueprint, validate_request, validate_response
+from quart import Blueprint, current_app, make_response, request
+from quart_schema import security_scheme, security_scheme_blueprint, tag_blueprint, validate_request
 
-from app.infrastructure.web.auth import issue_auth_tokens, refresh_auth_tokens, revoke_refresh_token
+from app.infrastructure.web.auth import (
+    AuthenticationError,
+    issue_auth_tokens,
+    refresh_auth_tokens,
+    revoke_refresh_token,
+)
 from app.infrastructure.web.dependencies import request_services
 from app.infrastructure.web.schemas import (
-    AuthTokens,
     LoginRequest,
-    LogoutResponse,
-    RefreshTokenRequest,
-    RefreshTokensResponse,
     UserSchema,
 )
 from app.infrastructure.web.utils import success
@@ -22,7 +23,6 @@ security_scheme_blueprint(auth, [])
 #@security_scheme([])
 @auth.post("/login")
 @validate_request(LoginRequest)
-@validate_response(AuthTokens)
 async def login(data: LoginRequest):
     async with request_services() as services:
         user = await services["authenticate_user"].execute(
@@ -30,25 +30,55 @@ async def login(data: LoginRequest):
             password=data.password,
         )
 
-    tokens = issue_auth_tokens(user.id)
-    return success(
+    tokens = await issue_auth_tokens(user.id)
+    response = await make_response(success(
         {
-            **tokens,
+            "access_token": tokens["access_token"],
             "user": asdict(UserSchema.from_entity(user)),
         }
-    )
+    ))
+    _set_refresh_cookie(response, tokens["refresh_token"])
+    return response
 
 
 @auth.post("/refresh")
-@validate_request(RefreshTokenRequest)
-@validate_response(RefreshTokensResponse)
-async def refresh_tokens(data: RefreshTokenRequest):
-    return success(refresh_auth_tokens(data.refresh_token))
+async def refresh_tokens():
+    refresh_token = request.cookies.get(_refresh_cookie_name())
+    if not refresh_token:
+        raise AuthenticationError("Missing refresh-token cookie")
+
+    tokens = await refresh_auth_tokens(refresh_token)
+    response = await make_response(success({"access_token": tokens["access_token"]}))
+    _set_refresh_cookie(response, tokens["refresh_token"])
+    return response
 
 
 @auth.post("/logout")
-@validate_request(RefreshTokenRequest)
-@validate_response(LogoutResponse)
-async def logout(data: RefreshTokenRequest):
-    revoke_refresh_token(data.refresh_token)
-    return success({"message": "Logged out"})
+async def logout():
+    refresh_token = request.cookies.get(_refresh_cookie_name())
+    if refresh_token:
+        try:
+            await revoke_refresh_token(refresh_token)
+        except AuthenticationError:
+            # An expired or already-rotated cookie is still safe to clear.
+            pass
+
+    response = await make_response(success({"message": "Logged out"}))
+    response.delete_cookie(_refresh_cookie_name(), path="/auth")
+    return response
+
+
+def _refresh_cookie_name() -> str:
+    return current_app.config["AUTH_REFRESH_COOKIE_NAME"]
+
+
+def _set_refresh_cookie(response, refresh_token: str) -> None:
+    response.set_cookie(
+        _refresh_cookie_name(),
+        refresh_token,
+        max_age=current_app.config["AUTH_REFRESH_TOKEN_MAX_AGE"],
+        httponly=True,
+        secure=current_app.config["AUTH_REFRESH_COOKIE_SECURE"],
+        samesite=current_app.config["AUTH_REFRESH_COOKIE_SAMESITE"],
+        path="/auth",
+    )

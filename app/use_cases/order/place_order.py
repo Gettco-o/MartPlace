@@ -74,7 +74,11 @@ class PlaceOrder:
             items=normalized_items,
             amount=total_amount,
         )
-        wallet_entry = wallet.debit(total_amount, reference_id=order.id)
+        wallet_entry = wallet.debit(
+            total_amount,
+            reference_id=order.id,
+            user_email=buyer.email,
+        )
         order.mark_paid(
             user_email=buyer.email,
             tenant_admin_emails=tenant_admin_emails,

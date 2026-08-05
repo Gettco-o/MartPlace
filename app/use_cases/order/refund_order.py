@@ -56,7 +56,15 @@ class RefundOrder:
         if wallet is None:
             raise DomainError("Wallet does not exist")
 
-        wallet_entry = wallet.credit(order.amount, reference_id=f"refund:{order.id}")
+        buyer = await self.user_repo.get_by_id(order.user_id)
+        if not buyer:
+            raise DomainError("Buyer not found")
+
+        wallet_entry = wallet.credit(
+            order.amount,
+            reference_id=f"refund:{order.id}",
+            user_email=buyer.email,
+        )
         if should_reverse_tenant_wallet:
             tenant_wallet = await self.tenant_wallet_repo.get_wallet(tenant_id)
             if tenant_wallet is None:
@@ -69,10 +77,6 @@ class RefundOrder:
                     reference_id=reversal_reference,
                 )
                 await self.tenant_wallet_repo.append_entry(tenant_wallet_entry)
-
-        buyer = await self.user_repo.get_by_id(order.user_id)
-        if not buyer:
-            raise DomainError("Buyer not found")
 
         tenant_admin_emails = tuple(
             user.email

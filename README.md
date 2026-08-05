@@ -93,6 +93,9 @@ cp .env.example .env
 | `SECRET_KEY` | `change-me` | Secret key used for JWT signing and session security |
 | `AUTH_TOKEN_MAX_AGE` | `900` | Access token expiration in seconds (15 minutes) |
 | `AUTH_REFRESH_TOKEN_MAX_AGE` | `604800` | Refresh token expiration in seconds (7 days) |
+| `AUTH_REFRESH_COOKIE_NAME` | `refresh_token` | Name of the HttpOnly refresh-token cookie |
+| `AUTH_REFRESH_COOKIE_SECURE` | `true` | Send refresh cookie only over HTTPS (set `false` for local HTTP only) |
+| `AUTH_REFRESH_COOKIE_SAMESITE` | `Lax` | SameSite policy for the refresh-token cookie |
 | `EVENT_LOG_PATH` | `logs/events.log` | File path for appended domain event logs |
 | `EMAIL_LOG_PATH` | `logs/emails.log` | File path for emitted email notifications |
 
@@ -237,9 +240,12 @@ Interactive OpenAPI documentation is available via Quart Schema when running the
 - `GET /health` - Service health status check
 
 #### Authentication (`/auth`)
-- `POST /auth/login` - Authenticate user & obtain access/refresh tokens
-- `POST /auth/refresh` - Refresh access token
-- `POST /auth/logout` - Invalidate current session
+- `POST /auth/login` - Authenticate and return an access token; sends the refresh token as an HttpOnly cookie
+- `POST /auth/refresh` - Rotate the HttpOnly refresh-token cookie and return a new access token
+- `POST /auth/logout` - Invalidate the Redis-backed refresh session and clear its cookie
+
+For a browser client on another site, configure the cookie with
+`AUTH_REFRESH_COOKIE_SAMESITE=None`, leave `AUTH_REFRESH_COOKIE_SECURE=true`, and configure CORS with that client's explicit origin. Browser requests to `/auth/refresh` and `/auth/logout` must include credentials.
 
 #### User Management (`/users`)
 - `POST /users/buyers` - Register buyer account
@@ -319,5 +325,3 @@ python3 -m pytest
 - [ ] Add persistent in-app notifications & activity feed for tenant users
 - [ ] Add advanced search, filtering, and pagination across order & product endpoints
 - [ ] Add analytics dashboard endpoints for platform and tenant metrics
-
-
